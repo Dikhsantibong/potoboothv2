@@ -50,6 +50,7 @@ interface Transaction {
         id: number;
         image_url: string;
         video_url: string | null;
+        amount_print: number | null;
         print_quantity: number;
     } | null;
     photos: Array<{
@@ -203,20 +204,34 @@ return '-';
                                 <div className="text-muted-foreground">Order ID</div>
                                 <div className="font-medium">{transaction.transaction_id}</div>
 
-                                <div className="text-muted-foreground">Amount</div>
+                                <div className="text-muted-foreground">Biaya Sesi</div>
                                 <div className="font-bold">{formatCurrency(transaction.amount)}</div>
 
                                 <div className="text-muted-foreground">Payment Type</div>
                                 <div className="font-medium">{formatPaymentType(transaction.payment_type)}</div>
 
                                 <div className="text-muted-foreground">Paid At</div>
-                                <div>{transaction.status === 'SUCCESS' ? formatDate(transaction.finished_at) : '-'}</div>
+                                <div>{transaction.status === 'COMPLETED' ? formatDate(transaction.finished_at) : '-'}</div>
 
                                 <div className="text-muted-foreground">Print Quantity</div>
                                 <div className="font-bold">{transaction.final_image?.print_quantity || 0} print(s)</div>
 
+                                <div className="text-muted-foreground">Biaya Print</div>
+                                <div className="font-bold">
+                                    {transaction.final_image?.amount_print
+                                        ? formatCurrency(transaction.final_image.amount_print * (transaction.final_image.print_quantity || 1))
+                                        : '-'}
+                                </div>
+
                                 <div className="text-muted-foreground">Total Cost</div>
-                                <div className="font-bold text-primary">{formatCurrency(transaction.amount)}</div>
+                                <div className="font-bold text-primary">
+                                    {formatCurrency(
+                                        transaction.amount +
+                                        (transaction.final_image?.amount_print
+                                            ? transaction.final_image.amount_print * (transaction.final_image.print_quantity || 1)
+                                            : 0)
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

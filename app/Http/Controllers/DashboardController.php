@@ -47,12 +47,14 @@ class DashboardController extends Controller
                 $periodTransactions = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])->count();
                 $previousPeriodTransactions = Transaction::whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])->count();
 
-                $periodRevenue = (int) Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
-                    ->where('status', $successStatus)
-                    ->sum('amount');
-                $previousPeriodRevenue = (int) Transaction::whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])
-                    ->where('status', $successStatus)
-                    ->sum('amount');
+                $periodRevenue = (int) $this->revenueQuery(
+                    Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
+                        ->where('status', $successStatus)
+                );
+                $previousPeriodRevenue = (int) $this->revenueQuery(
+                    Transaction::whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])
+                        ->where('status', $successStatus)
+                );
 
                 $periodSessions = Transaction::whereBetween('started_at', [$rangeStart, $rangeEnd])->count();
                 $periodVoucherUsage = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
@@ -123,8 +125,9 @@ class DashboardController extends Controller
                     ? round(($successTransactions / $periodTransactions) * 100)
                     : 0;
 
-                $totalRevenue = (int) Transaction::where('status', $successStatus)
-                    ->sum('amount');
+                $totalRevenue = (int) $this->revenueQuery(
+                    Transaction::where('status', $successStatus)
+                );
 
                 $revenueSummary = [
                     'today' => 'Rp ' . number_format($periodRevenue, 0, ',', '.'),
@@ -141,24 +144,24 @@ class DashboardController extends Controller
                     ->where('status', $successStatus)
                     ->whereRaw('LOWER(payment_type) = ?', ['qris']);
                 $qrisCount = (clone $qrisQuery)->count();
-                $qrisTotal = (int) (clone $qrisQuery)->sum('amount');
+                $qrisTotal = (int) $this->revenueQuery(clone $qrisQuery);
 
                 $voucherQuery = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->where('status', $successStatus)
                     ->whereNotNull('voucher_id');
                 $voucherCount = (clone $voucherQuery)->count();
-                $voucherTotal = (int) (clone $voucherQuery)->sum('amount');
+                $voucherTotal = (int) $this->revenueQuery(clone $voucherQuery);
 
                 // All-time accumulated
                 $allQrisQuery = Transaction::where('status', $successStatus)
                     ->whereRaw('LOWER(payment_type) = ?', ['qris']);
                 $allQrisCount = (clone $allQrisQuery)->count();
-                $allQrisTotal = (int) (clone $allQrisQuery)->sum('amount');
+                $allQrisTotal = (int) $this->revenueQuery(clone $allQrisQuery);
 
                 $allVoucherQuery = Transaction::where('status', $successStatus)
                     ->whereNotNull('voucher_id');
                 $allVoucherCount = (clone $allVoucherQuery)->count();
-                $allVoucherTotal = (int) (clone $allVoucherQuery)->sum('amount');
+                $allVoucherTotal = (int) $this->revenueQuery(clone $allVoucherQuery);
 
                 $transactionBreakdown = [
                     'qris' => [
@@ -232,9 +235,10 @@ class DashboardController extends Controller
         $uptimeTarget = (int) config('dashboard.targets.machine_uptime_percent', 95);
 
         $todayTransactionCount = Transaction::whereBetween('created_at', [$todayStart, $todayEnd])->count();
-        $todayRevenue = (int) Transaction::whereBetween('created_at', [$todayStart, $todayEnd])
-            ->where('status', 'SUCCESS')
-            ->sum('amount');
+        $todayRevenue = (int) $this->revenueQuery(
+            Transaction::whereBetween('created_at', [$todayStart, $todayEnd])
+                ->where('status', 'COMPLETED')
+        );
         $activeMachines = Machine::where('is_active', true)->count();
         $totalMachines = Machine::count();
 
@@ -274,6 +278,25 @@ class DashboardController extends Controller
         }
 
         return $chart;
+    }
+
+    /**
+     * Calculate total revenue (session amount + print costs) for a given query.
+     *
+     * Revenue = SUM(transactions.amount) + SUM(final_images.amount_print * final_images.print_quantity)
+     */
+    private function revenueQuery($query): int
+    {
+        $baseAmount = (int) (clone $query)->sum('amount');
+
+        $printRevenue = (int) (clone $query)
+            ->join('final_images', 'final_images.transaction_id', '=', 'transactions.id')
+            ->whereNotNull('final_images.amount_print')
+            ->where('final_images.printed', true)
+            ->selectRaw('SUM(final_images.amount_print * final_images.print_quantity) as print_total')
+            ->value('print_total');
+
+        return $baseAmount + $printRevenue;
     }
 }
 
