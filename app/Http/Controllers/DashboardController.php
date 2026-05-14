@@ -300,7 +300,8 @@ class DashboardController extends Controller
             $printRevenue = (int) FinalImage::whereIn('transaction_id', $transactionIds)
                 ->whereNotNull('amount_print')
                 ->where('printed', true)
-                ->selectRaw('SUM(amount_print * print_quantity) as print_total')
+                ->where('print_quantity', '>', 1)
+                ->selectRaw('SUM(amount_print * (print_quantity - 1)) as print_total')
                 ->value('print_total');
         }
 

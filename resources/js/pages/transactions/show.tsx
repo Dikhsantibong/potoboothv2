@@ -218,8 +218,8 @@ return '-';
 
                                 <div className="text-muted-foreground">Biaya Print</div>
                                 <div className="font-bold">
-                                    {transaction.final_image?.amount_print
-                                        ? formatCurrency(transaction.final_image.amount_print * (transaction.final_image.print_quantity || 1))
+                                    {transaction.final_image?.amount_print && (transaction.final_image.print_quantity || 1) > 1
+                                        ? formatCurrency(transaction.final_image.amount_print * ((transaction.final_image.print_quantity || 1) - 1))
                                         : '-'}
                                 </div>
 
@@ -227,8 +227,8 @@ return '-';
                                 <div className="font-bold text-primary">
                                     {formatCurrency(
                                         transaction.amount +
-                                        (transaction.final_image?.amount_print
-                                            ? transaction.final_image.amount_print * (transaction.final_image.print_quantity || 1)
+                                        (transaction.final_image?.amount_print && (transaction.final_image.print_quantity || 1) > 1
+                                            ? transaction.final_image.amount_print * ((transaction.final_image.print_quantity || 1) - 1)
                                             : 0)
                                     )}
                                 </div>
