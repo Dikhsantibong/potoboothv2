@@ -145,24 +145,36 @@ class DashboardController extends Controller
                     ->where('status', $successStatus)
                     ->whereRaw('LOWER(payment_type) = ?', ['qris']);
                 $qrisCount = (clone $qrisQuery)->count();
-                $qrisTotal = (int) $this->revenueQuery(clone $qrisQuery);
+                // Compute period components separately
+                $qrisBase = (int) (clone $qrisQuery)->sum('amount');
+                $qrisPrint = $this->printRevenueOnly($qrisQuery);
 
-                $voucherQuery = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
-                    ->where('status', $successStatus)
-                    ->whereNotNull('voucher_id');
-                $voucherCount = (clone $voucherQuery)->count();
-                $voucherTotal = (int) $this->revenueQuery(clone $voucherQuery);
+                $voucherBase = (int) (clone $voucherQuery)->sum('amount');
+                $voucherPrint = $this->printRevenueOnly($voucherQuery);
+
+                // Merge Voucher's print revenue into QRIS
+                $qrisTotal = $qrisBase + $qrisPrint + $voucherPrint;
+                $voucherTotal = $voucherBase;
 
                 // All-time accumulated
                 $allQrisQuery = Transaction::where('status', $successStatus)
                     ->whereRaw('LOWER(payment_type) = ?', ['qris']);
                 $allQrisCount = (clone $allQrisQuery)->count();
-                $allQrisTotal = (int) $this->revenueQuery(clone $allQrisQuery);
 
                 $allVoucherQuery = Transaction::where('status', $successStatus)
                     ->whereNotNull('voucher_id');
                 $allVoucherCount = (clone $allVoucherQuery)->count();
-                $allVoucherTotal = (int) $this->revenueQuery(clone $allVoucherQuery);
+
+                // Compute all-time components separately
+                $allQrisBase = (int) (clone $allQrisQuery)->sum('amount');
+                $allQrisPrint = $this->printRevenueOnly($allQrisQuery);
+
+                $allVoucherBase = (int) (clone $allVoucherQuery)->sum('amount');
+                $allVoucherPrint = $this->printRevenueOnly($allVoucherQuery);
+
+                // Merge Voucher's print revenue into QRIS for all-time as well
+                $allQrisTotal = $allQrisBase + $allQrisPrint + $allVoucherPrint;
+                $allVoucherTotal = $allVoucherBase;
 
                 $transactionBreakdown = [
                     'qris' => [
@@ -292,19 +304,25 @@ class DashboardController extends Controller
     private function revenueQuery($query): int
     {
         $baseAmount = (int) (clone $query)->sum('transactions.amount');
+        return $baseAmount + $this->printRevenueOnly($query);
+    }
 
+    /**
+     * Extracts only the print revenue for a given query.
+     */
+    private function printRevenueOnly($query): int
+    {
         $transactionIds = (clone $query)->pluck('transactions.id');
 
-        $printRevenue = 0;
-        if ($transactionIds->isNotEmpty()) {
-            $printRevenue = (int) FinalImage::whereIn('transaction_id', $transactionIds)
-                ->whereNotNull('amount_print')
-                ->where('printed', true)
-                ->selectRaw('SUM(amount_print) as print_total')
-                ->value('print_total');
+        if ($transactionIds->isEmpty()) {
+            return 0;
         }
 
-        return $baseAmount + $printRevenue;
+        return (int) FinalImage::whereIn('transaction_id', $transactionIds)
+            ->whereNotNull('amount_print')
+            ->where('printed', true)
+            ->selectRaw('SUM(amount_print) as print_total')
+            ->value('print_total');
     }
 }
 
