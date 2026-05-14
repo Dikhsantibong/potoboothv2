@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FinalImage;
 use App\Models\Machine;
 use App\Models\Transaction;
 use App\Models\Voucher;
@@ -284,17 +285,24 @@ class DashboardController extends Controller
      * Calculate total revenue (session amount + print costs) for a given query.
      *
      * Revenue = SUM(transactions.amount) + SUM(final_images.amount_print * final_images.print_quantity)
+     *
+     * Uses a subquery approach instead of JOIN to avoid column ambiguity
+     * (both transactions and final_images have created_at columns).
      */
     private function revenueQuery($query): int
     {
-        $baseAmount = (int) (clone $query)->sum('amount');
+        $baseAmount = (int) (clone $query)->sum('transactions.amount');
 
-        $printRevenue = (int) (clone $query)
-            ->join('final_images', 'final_images.transaction_id', '=', 'transactions.id')
-            ->whereNotNull('final_images.amount_print')
-            ->where('final_images.printed', true)
-            ->selectRaw('SUM(final_images.amount_print * final_images.print_quantity) as print_total')
-            ->value('print_total');
+        $transactionIds = (clone $query)->pluck('transactions.id');
+
+        $printRevenue = 0;
+        if ($transactionIds->isNotEmpty()) {
+            $printRevenue = (int) FinalImage::whereIn('transaction_id', $transactionIds)
+                ->whereNotNull('amount_print')
+                ->where('printed', true)
+                ->selectRaw('SUM(amount_print * print_quantity) as print_total')
+                ->value('print_total');
+        }
 
         return $baseAmount + $printRevenue;
     }
