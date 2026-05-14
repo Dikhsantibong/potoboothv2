@@ -15,7 +15,7 @@ class TransactionController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = Transaction::with(['machine', 'template'])->latest();
+        $query = Transaction::with(['machine', 'template', 'finalImage'])->latest();
 
         // Search by transaction_id or machine name
         if ($request->filled('search')) {

@@ -50,6 +50,11 @@ interface Transaction {
         id: number;
         name: string;
     } | null;
+    final_image: {
+        id: number;
+        amount_print: number | null;
+        print_quantity: number;
+    } | null;
 }
 
 interface TransactionPaginator {
@@ -191,7 +196,7 @@ return '-';
                                 <TableHead className="w-[150px]">Transaction ID</TableHead>
                                 <TableHead>Machine</TableHead>
                                 <TableHead>Template</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
                                 <TableHead>Payment Type</TableHead>
                                 <TableHead className="text-center">Status</TableHead>
                                 <TableHead>Started At</TableHead>
@@ -230,7 +235,9 @@ return '-';
                                             <TableCell>{transaction.machine.name}</TableCell>
                                             <TableCell>{transaction.template?.name || 'N/A'}</TableCell>
                                             <TableCell className="text-right font-semibold">
-                                                {formatCurrency(transaction.amount)}
+                                                {formatCurrency(
+                                                    transaction.amount + (transaction.final_image?.amount_print || 0)
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-xs text-muted-foreground">
                                                 {formatPaymentType(transaction.payment_type)}
