@@ -39,8 +39,10 @@ class DashboardController extends Controller
         $previousRangeStart = $rangeStart->copy()->subDays($rangeDays);
         $previousRangeEnd = $rangeStart->copy()->subSecond();
 
+        $activeMachineId = session('active_machine_id') ?? Machine::first()?->id ?? 'none';
+
         $payload = Cache::remember(
-            "dashboard:metrics:{$rangeStart->toDateString()}:{$rangeEnd->toDateString()}",
+            "dashboard:metrics:{$rangeStart->toDateString()}:{$rangeEnd->toDateString()}:machine:{$activeMachineId}",
             now()->addSeconds($cacheTtlSeconds),
             function () use ($rangeStart, $rangeEnd, $previousRangeStart, $previousRangeEnd) {
                 $successStatus = 'COMPLETED';
