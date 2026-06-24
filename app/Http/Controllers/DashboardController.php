@@ -207,6 +207,15 @@ class DashboardController extends Controller
                     'transactionChartData' => $this->buildRangeTransactionChart($rangeStart, $rangeEnd),
                     'revenueSummary' => $revenueSummary,
                     'transactionBreakdown' => $transactionBreakdown,
+                    'machinesPaper' => Machine::where('is_active', true)->get()->map(function ($m) {
+                        return [
+                            'id' => $m->id,
+                            'name' => $m->name,
+                            'remaining' => $m->paper_condition['remaining'],
+                            'percentage' => $m->paper_condition['percentage'],
+                            'indicator' => $m->paper_condition['indicator']
+                        ];
+                    })->values()->all(),
                 ];
             }
         );
@@ -218,6 +227,7 @@ class DashboardController extends Controller
             'transactionChartData' => $payload['transactionChartData'],
             'revenueSummary' => $payload['revenueSummary'],
             'transactionBreakdown' => $payload['transactionBreakdown'],
+            'machinesPaper' => $payload['machinesPaper'] ?? [],
             'reportFilters' => [
                 'startDate' => $rangeStart->toDateString(),
                 'endDate' => $rangeEnd->toDateString(),

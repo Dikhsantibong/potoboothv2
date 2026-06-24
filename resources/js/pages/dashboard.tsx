@@ -84,6 +84,14 @@ type ReportFilters = {
     endDate: string;
 };
 
+type MachinePaper = {
+    id: number;
+    name: string;
+    remaining: number;
+    percentage: number;
+    indicator: string;
+};
+
 type DashboardPageProps = {
     auth?: { user?: { name?: string } };
     stats: DashboardStat[];
@@ -93,6 +101,7 @@ type DashboardPageProps = {
     revenueSummary: RevenueSummary;
     transactionBreakdown: TransactionBreakdown;
     reportFilters: ReportFilters;
+    machinesPaper: MachinePaper[];
 };
 
 const iconMap: Record<IconKey, ComponentType<{ className?: string }>> = {
@@ -103,12 +112,15 @@ const iconMap: Record<IconKey, ComponentType<{ className?: string }>> = {
 };
 
 export default function Dashboard() {
-    const { auth, stats, recentActivities, performanceTargets, transactionChartData, revenueSummary, transactionBreakdown, reportFilters } =
-        usePage<DashboardPageProps>().props;
+    const { auth, stats, recentActivities, performanceTargets, transactionChartData, revenueSummary, transactionBreakdown, reportFilters, machinesPaper, activeMachine } =
+        usePage<DashboardPageProps & { activeMachine?: { id: number, name: string } }>().props;
     const firstName = auth?.user?.name?.split(' ')[0] ?? 'Tim';
     const maxTransaction = Math.max(1, ...transactionChartData.map((item) => item.total));
     const [startDate, setStartDate] = useState(reportFilters.startDate);
     const [endDate, setEndDate] = useState(reportFilters.endDate);
+
+    const filteredMachinesPaper = machinesPaper.filter(m => activeMachine ? m.id === activeMachine.id : true);
+    const lowPaperMachines = filteredMachinesPaper.filter(m => m.percentage <= 20);
 
     const applyDateFilter = () => {
         router.get(
@@ -159,6 +171,29 @@ export default function Dashboard() {
                         </Badge>
                     </CardHeader>
                 </Card>
+
+                {lowPaperMachines && lowPaperMachines.length > 0 && (
+                    <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                        <div className="flex items-start gap-3">
+                            <BellRing className="mt-0.5 h-5 w-5 text-destructive" />
+                            <div>
+                                <h3 className="font-medium text-destructive">Peringatan: Stok Kertas Menipis</h3>
+                                <ul className="mt-2 space-y-1 text-sm text-destructive/90">
+                                    {lowPaperMachines.map(m => (
+                                        <li key={m.id}>
+                                            Mesin <strong>{m.name}</strong> tersisa <strong>{m.remaining}</strong> lembar ({m.percentage}%).
+                                        </li>
+                                    ))}
+                                </ul>
+                                <Button variant="outline" size="sm" className="mt-3 border-destructive/20 text-destructive hover:bg-destructive/20" asChild>
+                                    <Link href={machinesRoute.index().url}>
+                                        Isi Ulang Kertas
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <Card className="py-4">
                     <CardHeader className="pb-3">
@@ -212,6 +247,40 @@ export default function Dashboard() {
                             </Card>
                         );
                     })}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredMachinesPaper && filteredMachinesPaper.length > 0 && (
+                        <Card className="lg:col-span-3">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4" />
+                                    Status Kertas Mesin
+                                </CardTitle>
+                                <CardDescription>
+                                    Pantau sisa stok kertas pada masing-masing mesin.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+                                    {filteredMachinesPaper.map(m => (
+                                        <div key={m.id} className="flex flex-col gap-2 rounded-lg border p-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-medium">{m.name}</span>
+                                                <Badge variant={m.indicator === 'hijau' ? 'default' : m.indicator === 'kuning' ? 'secondary' : 'destructive'}
+                                                       className={m.indicator === 'kuning' ? 'bg-yellow-500 text-white hover:bg-yellow-600' : ''}>
+                                                    {m.percentage}%
+                                                </Badge>
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                                Sisa <strong>{m.remaining}</strong> lembar
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 <div className="grid gap-4">

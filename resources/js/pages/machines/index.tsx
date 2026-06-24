@@ -50,6 +50,15 @@ interface Machine {
     amount_print_koran: number;
     amount_print_reguler: number;
     amount_print_flipbook: number;
+    paper_capacity: number;
+    paper_condition?: {
+        initial_stock: number;
+        total_used: number;
+        remaining: number;
+        percentage: number;
+        indicator: string;
+        last_reset: string | null;
+    };
     created_at: string;
     updated_at: string;
 }
@@ -61,6 +70,7 @@ interface Props {
 export default function MachineIndex({ machines }: Props) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isResetPaperModalOpen, setIsResetPaperModalOpen] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -92,6 +102,7 @@ export default function MachineIndex({ machines }: Props) {
         amount_print_koran: 0,
         amount_print_reguler: 0,
         amount_print_flipbook: 0,
+        paper_capacity: 700,
     });
 
     const openEditModal = (machine: Machine) => {
@@ -107,6 +118,7 @@ export default function MachineIndex({ machines }: Props) {
             amount_print_koran: machine.amount_print_koran || 0,
             amount_print_reguler: machine.amount_print_reguler || 0,
             amount_print_flipbook: machine.amount_print_flipbook || 0,
+            paper_capacity: machine.paper_capacity || 700,
         });
         clearErrors();
         setIsEditModalOpen(true);
@@ -115,6 +127,11 @@ export default function MachineIndex({ machines }: Props) {
     const openDeleteModal = (machine: Machine) => {
         setSelectedMachine(machine);
         setIsDeleteModalOpen(true);
+    };
+
+    const openResetPaperModal = (machine: Machine) => {
+        setSelectedMachine(machine);
+        setIsResetPaperModalOpen(true);
     };
 
     const submitEdit = (e: React.FormEvent) => {
@@ -136,6 +153,17 @@ export default function MachineIndex({ machines }: Props) {
                 setIsDeleteModalOpen(false);
                 setSelectedMachine(null);
                 toast.success('Machine deleted successfully');
+            },
+        });
+    };
+
+    const submitResetPaper = () => {
+        if (!selectedMachine) return;
+        post(machinesRoute.resetPaper(selectedMachine.id).url, {
+            onSuccess: () => {
+                setIsResetPaperModalOpen(false);
+                setSelectedMachine(null);
+                toast.success('Paper stock reset successfully');
             },
         });
     };
@@ -229,6 +257,7 @@ export default function MachineIndex({ machines }: Props) {
                                 <TableHead>Status</TableHead>
                                 <TableHead>Payment</TableHead>
                                 <TableHead>Token</TableHead>
+                                <TableHead>Paper Stock</TableHead>
                                 <TableHead></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -272,6 +301,23 @@ export default function MachineIndex({ machines }: Props) {
                                                 {machine.token || '-'}
                                             </div>
                                         </TableCell>
+                                        <TableCell>
+                                            {machine.paper_condition ? (
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant={machine.paper_condition.indicator === 'hijau' ? 'default' : machine.paper_condition.indicator === 'kuning' ? 'secondary' : 'destructive'}
+                                                               className={machine.paper_condition.indicator === 'kuning' ? 'bg-yellow-500 text-white hover:bg-yellow-600' : ''}>
+                                                            {machine.paper_condition.percentage}%
+                                                        </Badge>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {machine.paper_condition.remaining} / {machine.paper_condition.initial_stock}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">-</span>
+                                            )}
+                                        </TableCell>
                                         <TableCell className='text-end'>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -282,6 +328,9 @@ export default function MachineIndex({ machines }: Props) {
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem onClick={() => openEditModal(machine)}>
                                                         <Edit className="mr-2 h-4 w-4" /> Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => openResetPaperModal(machine)}>
+                                                        <RefreshCw className="mr-2 h-4 w-4" /> Reset Paper
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         className="text-destructive focus:text-destructive"
@@ -429,6 +478,19 @@ export default function MachineIndex({ machines }: Props) {
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-medium leading-none">Paper Settings</h4>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-paper_capacity">Initial Paper Capacity</Label>
+                                    <Input
+                                        id="edit-paper_capacity"
+                                        type="number"
+                                        value={data.paper_capacity}
+                                        onChange={(e) => setData('paper_capacity', parseInt(e.target.value) || 0)}
+                                    />
+                                </div>
+                            </div>
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
@@ -457,6 +519,26 @@ export default function MachineIndex({ machines }: Props) {
                         </Button>
                         <Button variant="destructive" onClick={submitDelete} disabled={processing}>
                             Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reset Paper Confirmation Modal */}
+            <Dialog open={isResetPaperModalOpen} onOpenChange={setIsResetPaperModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Reset Paper Stock</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to reset the paper stock for <strong>{selectedMachine?.name}</strong> to its initial capacity? This will mark the current time as the last reset point.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsResetPaperModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={submitResetPaper} disabled={processing}>
+                            Reset Paper
                         </Button>
                     </DialogFooter>
                 </DialogContent>

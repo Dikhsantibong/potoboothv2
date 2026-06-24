@@ -36,6 +36,7 @@ class MachineController extends Controller
             'amount_print_koran' => 'nullable|integer|min:0',
             'amount_print_reguler' => 'nullable|integer|min:0',
             'amount_print_flipbook' => 'nullable|integer|min:0',
+            'paper_capacity' => 'nullable|integer|min:1',
         ]);
 
         Machine::create($validated);
@@ -59,6 +60,7 @@ class MachineController extends Controller
             'amount_print_koran' => 'nullable|integer|min:0',
             'amount_print_reguler' => 'nullable|integer|min:0',
             'amount_print_flipbook' => 'nullable|integer|min:0',
+            'paper_capacity' => 'nullable|integer|min:1',
         ]);
 
         $machine->update($validated);
@@ -74,5 +76,15 @@ class MachineController extends Controller
         $machine->delete();
 
         return to_route('machines.index')->with('status', 'machine-deleted');
+    }
+
+    /**
+     * Reset the paper stock for the specified machine.
+     */
+    public function resetPaper(Machine $machine): RedirectResponse
+    {
+        $machine->update(['paper_reset_at' => now()]);
+
+        return back()->with('success', 'Paper stock has been successfully reset.');
     }
 }
