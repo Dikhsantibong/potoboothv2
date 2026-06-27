@@ -1,5 +1,5 @@
 import { Head, useForm, Link, router } from '@inertiajs/react';
-import { Plus, Edit, Trash2, MoreVertical, Search, Image as ImageIcon, Layout, Maximize, FileText, Layers } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Search, Image as ImageIcon, Layout, Maximize, FileText, Layers, Grid, List } from 'lucide-react';
 import { useState } from 'react';
 import { Pagination } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
@@ -86,6 +86,7 @@ export default function TemplateIndex({ templates, filters }: Props) {
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [typeFilter, setTypeFilter] = useState(filters.type || 'all');
     const [orientationFilter, setOrientationFilter] = useState(filters.orientation || 'all');
+    const [viewMode, setViewMode] = useState<'table' | 'gallery'>('gallery');
 
     const handleFilter = (key: string, value: string) => {
         const newFilters = {
@@ -214,9 +215,34 @@ export default function TemplateIndex({ templates, filters }: Props) {
                                     <SelectItem value="landscape">Landscape</SelectItem>
                                 </SelectContent>
                             </Select>
+
+                            <div className="h-6 w-px bg-border mx-1 hidden sm:block"></div>
+                            
+                            <div className="flex items-center rounded-md border bg-muted/50 p-1">
+                                <Button
+                                    type="button"
+                                    variant={viewMode === 'gallery' ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => setViewMode('gallery')}
+                                >
+                                    <Grid className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => setViewMode('table')}
+                                >
+                                    <List className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                    <Table>
+
+                    {viewMode === 'table' ? (
+                        <Table>
                         <TableHeader className='bg-sidebar'>
                             <TableRow>
                                 <TableHead className="w-[80px]">Preview</TableHead>
@@ -326,6 +352,85 @@ export default function TemplateIndex({ templates, filters }: Props) {
                             )}
                         </TableBody>
                     </Table>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
+                            {templates.data.length === 0 ? (
+                                <div className="col-span-full py-12 text-center text-muted-foreground">
+                                    {(filters.search || filters.type || filters.orientation)
+                                        ? 'No templates match your filters.'
+                                        : 'No templates found.'}
+                                </div>
+                            ) : (
+                                templates.data.map((template) => (
+                                    <div key={template.id} className="group relative rounded-xl border bg-card overflow-hidden shadow-sm transition-all hover:shadow-md">
+                                        <div className="aspect-[3/4] bg-muted relative overflow-hidden flex items-center justify-center">
+                                            {template.template_path ? (
+                                                <img
+                                                    src={getThumbnailUrl(template.template_path)!}
+                                                    alt={template.name}
+                                                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                                                />
+                                            ) : (
+                                                <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
+                                            )}
+                                            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="secondary" size="icon" className="h-8 w-8 shadow-sm bg-background/80 backdrop-blur-sm">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={templatesRoute.edit(template.id).url} className="flex items-center w-full">
+                                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleToggleStatus(template)}
+                                                        >
+                                                            <Layers className="mr-2 h-4 w-4" />
+                                                            {template.is_active ? 'Deactivate' : 'Activate'}
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive"
+                                                            onClick={() => openDeleteModal(template)}
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                            <div className="absolute top-2 left-2">
+                                                <Badge variant={template.is_active ? 'default' : 'secondary'} className="shadow-sm">
+                                                    {template.is_active ? 'Active' : 'Inactive'}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                        <div className="p-3">
+                                            <h3 className="font-semibold truncate" title={template.name}>{template.name}</h3>
+                                            {template.category && (
+                                                <p className="text-xs text-muted-foreground truncate">{template.category}</p>
+                                            )}
+                                            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                                                <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">
+                                                    {template.type}
+                                                </Badge>
+                                                <div className="flex items-center gap-1.5">
+                                                    {template.orientation === 'portrait' ? (
+                                                        <Layout className="h-3 w-3 rotate-90" />
+                                                    ) : (
+                                                        <Layout className="h-3 w-3" />
+                                                    )}
+                                                    <span className="capitalize">{template.orientation}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
                     <div className="border-t bg-sidebar/50">
                         <Pagination links={templates.links} className="py-3" />
                     </div>
