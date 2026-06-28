@@ -373,10 +373,10 @@ export default function TemplateIndex({ templates, filters }: Props) {
                                             ) : (
                                                 <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
                                             )}
-                                            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="absolute top-2 right-2 flex flex-col gap-1 transition-opacity">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="secondary" size="icon" className="h-8 w-8 shadow-sm bg-background/80 backdrop-blur-sm">
+                                                        <Button variant="secondary" size="icon" className="h-8 w-8 shadow-md bg-background/90 backdrop-blur-sm hover:bg-background">
                                                             <MoreVertical className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
