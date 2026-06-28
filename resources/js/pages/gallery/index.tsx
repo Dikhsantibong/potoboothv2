@@ -163,12 +163,12 @@ export default function GalleryIndex({ gallery, filters }: Props) {
                                         onClick={() => setSelectedImage(item)}
                                     />
 
-                                    {/* Hover Actions */}
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+                                    {/* Actions */}
+                                    <div className="absolute top-2 right-2 transition-opacity flex flex-col gap-1">
                                         <Button
                                             variant="secondary"
                                             size="icon"
-                                            className="h-8 w-8 shadow-md"
+                                            className="h-8 w-8 shadow-md bg-background/90 backdrop-blur-sm hover:bg-background"
                                             onClick={() => item.transaction_id && router.get(transactionsRoute.show({ transaction: item.transaction_id }).url)}
                                         >
                                             <Eye className="h-4 w-4" />
@@ -176,15 +176,15 @@ export default function GalleryIndex({ gallery, filters }: Props) {
                                         <Button
                                             variant="secondary"
                                             size="icon"
-                                            className="h-8 w-8 shadow-md"
+                                            className="h-8 w-8 shadow-md bg-background/90 backdrop-blur-sm hover:bg-background"
                                             onClick={() => downloadImage(item.image_url, `result-${item.transaction?.transaction_id || item.id}.png`)}
                                         >
                                             <Download className="h-4 w-4" />
                                         </Button>
                                     </div>
 
-                                    {/* Info Badge on Hover */}
-                                    <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    {/* Info Badge */}
+                                    <div className="absolute bottom-2 left-2 right-2 transition-opacity pointer-events-none">
                                         <div className="bg-black/60 text-white text-[10px] px-2 py-1 rounded text-center flex flex-col">
                                             <span className="truncate">{item.transaction?.transaction_id || 'Unknown'}</span>
                                             <span className="opacity-80 border-t border-white/20 mt-1 pt-0.5">{formatDate(item.created_at)}</span>
