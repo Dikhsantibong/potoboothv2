@@ -3,6 +3,7 @@ import { Search, Eye, Download, ExternalLink, Calendar, Monitor, ReceiptText, Tr
 import { useState } from 'react';
 import { Pagination } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
     DialogContent,
@@ -24,6 +25,15 @@ const formatDate = (date: string | null) => {
     } catch (e) {
         return '-';
     }
+};
+
+const isToday = (dateString: string | null) => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear();
 };
 
 interface FinalImage {
@@ -162,6 +172,13 @@ export default function GalleryIndex({ gallery, filters }: Props) {
                                         className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110 cursor-pointer"
                                         onClick={() => setSelectedImage(item)}
                                     />
+
+                                    {/* New Badge */}
+                                    {isToday(item.created_at) && (
+                                        <div className="absolute top-2 left-2 pointer-events-none">
+                                            <Badge className="bg-primary text-primary-foreground shadow-md text-[10px] px-1.5 py-0 font-bold uppercase tracking-wider">NEW</Badge>
+                                        </div>
+                                    )}
 
                                     {/* Actions */}
                                     <div className="absolute top-2 right-2 transition-opacity flex flex-col gap-1">
