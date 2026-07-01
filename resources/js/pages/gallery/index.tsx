@@ -176,7 +176,7 @@ export default function GalleryIndex({ gallery, filters }: Props) {
                                     {/* New Badge */}
                                     {isToday(item.created_at) && (
                                         <div className="absolute top-2 left-2 pointer-events-none">
-                                            <Badge className="bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-md text-[10px] px-1.5 py-0 font-bold uppercase tracking-wider">NEW</Badge>
+                                            <Badge className="bg-red-500 hover:bg-red-600 text-white shadow-md text-[10px] px-1.5 py-0 font-bold uppercase tracking-wider">NEW</Badge>
                                         </div>
                                     )}
 
