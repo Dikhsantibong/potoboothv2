@@ -59,15 +59,18 @@ interface Machine {
         indicator: string;
         last_reset: string | null;
     };
+    user_id?: number | null;
+    user?: { id: number; name: string };
     created_at: string;
     updated_at: string;
 }
 
 interface Props {
     machines: Machine[];
+    users: { id: number; name: string }[];
 }
 
-export default function MachineIndex({ machines }: Props) {
+export default function MachineIndex({ machines, users }: Props) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isResetPaperModalOpen, setIsResetPaperModalOpen] = useState(false);
@@ -103,6 +106,7 @@ export default function MachineIndex({ machines }: Props) {
         amount_print_reguler: 0,
         amount_print_flipbook: 0,
         paper_capacity: 700,
+        user_id: null as number | null,
     });
 
     const openEditModal = (machine: Machine) => {
@@ -119,6 +123,7 @@ export default function MachineIndex({ machines }: Props) {
             amount_print_reguler: machine.amount_print_reguler || 0,
             amount_print_flipbook: machine.amount_print_flipbook || 0,
             paper_capacity: machine.paper_capacity || 700,
+            user_id: machine.user_id || null,
         });
         clearErrors();
         setIsEditModalOpen(true);
@@ -256,6 +261,7 @@ export default function MachineIndex({ machines }: Props) {
                                 <TableHead>Name</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Payment</TableHead>
+                                <TableHead>Assigned Mitra</TableHead>
                                 <TableHead>Token</TableHead>
                                 <TableHead>Paper Stock</TableHead>
                                 <TableHead></TableHead>
@@ -284,6 +290,13 @@ export default function MachineIndex({ machines }: Props) {
                                             <Badge variant={machine.payment_required ? 'outline' : 'secondary'}>
                                                 {machine.payment_required ? 'Required' : 'Free'}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {machine.user ? (
+                                                <Badge variant="outline">{machine.user.name}</Badge>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">Unassigned</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="font-mono text-xs text-muted-foreground">
                                             <div className="flex items-center gap-2">
@@ -351,7 +364,7 @@ export default function MachineIndex({ machines }: Props) {
 
             {/* Edit Machine Modal */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <form onSubmit={submitEdit}>
                         <DialogHeader>
                             <DialogTitle>Edit Machine</DialogTitle>
@@ -411,6 +424,26 @@ export default function MachineIndex({ machines }: Props) {
                                     checked={data.payment_required}
                                     onCheckedChange={(checked) => setData('payment_required', checked)}
                                 />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-user_id">Assign to Mitra</Label>
+                                <Select
+                                    value={data.user_id ? data.user_id.toString() : "none"}
+                                    onValueChange={(value) => setData('user_id', value === "none" ? null : parseInt(value))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a mitra..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Unassigned (Admin Only)</SelectItem>
+                                        {users.map((user) => (
+                                            <SelectItem key={user.id} value={user.id.toString()}>
+                                                {user.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             <div className="space-y-4">

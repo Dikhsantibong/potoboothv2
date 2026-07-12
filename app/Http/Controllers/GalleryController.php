@@ -21,6 +21,13 @@ class GalleryController extends Controller
             ->where('image_path', '!=', 'EXPIRED')
             ->latest();
 
+        if (auth()->check() && auth()->user()->isMitra()) {
+            $machineIds = auth()->user()->machines()->pluck('id');
+            $query->whereHas('transaction', function($q) use ($machineIds) {
+                $q->whereIn('machine_id', $machineIds);
+            });
+        }
+
         // Search by Transaction ID (the string one from machine)
         if ($request->search) {
             $query->whereHas('transaction', function ($q) use ($request) {

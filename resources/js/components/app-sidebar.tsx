@@ -20,6 +20,10 @@ import templates from '@/routes/templates';
 import stickers from '@/routes/stickers';
 import type { NavItem } from '@/types';
 
+import { Users } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
@@ -35,6 +39,11 @@ const mainNavItems: NavItem[] = [
         title: 'Gallery',
         href: '/gallery',
         icon: ImageIcon,
+    },
+    {
+        title: 'Users',
+        href: '/users',
+        icon: Users,
     },
     {
         title: 'Templates',
@@ -77,6 +86,14 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<SharedData>().props;
+    const isMitra = auth.user.role === 'mitra';
+    
+    // Mitra only sees Dashboard and Transactions
+    const visibleItems = isMitra 
+        ? mainNavItems.filter(item => item.title === 'Transactions' || item.title === 'Dashboard') 
+        : mainNavItems;
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -84,7 +101,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={visibleItems} />
             </SidebarContent>
 
             <SidebarFooter>

@@ -16,7 +16,8 @@ class MachineController extends Controller
     public function index(): Response
     {
         return Inertia::render('machines/index', [
-            'machines' => Machine::latest()->get(),
+            'machines' => Machine::with('user')->latest()->get(),
+            'users' => \App\Models\User::where('role', 'mitra')->get(),
         ]);
     }
 
@@ -37,6 +38,7 @@ class MachineController extends Controller
             'amount_print_reguler' => 'nullable|integer|min:0',
             'amount_print_flipbook' => 'nullable|integer|min:0',
             'paper_capacity' => 'nullable|integer|min:1',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         Machine::create($validated);
@@ -61,6 +63,7 @@ class MachineController extends Controller
             'amount_print_reguler' => 'nullable|integer|min:0',
             'amount_print_flipbook' => 'nullable|integer|min:0',
             'paper_capacity' => 'nullable|integer|min:1',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         $machine->update($validated);

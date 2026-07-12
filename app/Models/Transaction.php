@@ -9,6 +9,16 @@ use App\Models\Traits\BelongsToMachine;
 class Transaction extends Model
 {
     use BelongsToMachine;
+
+    protected static function booted()
+    {
+        static::addGlobalScope('mitra', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            if (auth()->check() && auth()->user()->isMitra()) {
+                $builder->whereIn($builder->getModel()->getTable() . '.machine_id', auth()->user()->machines()->pluck('id'));
+            }
+        });
+    }
+
     protected $fillable = [
         'transaction_id',
         'machine_id',

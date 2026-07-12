@@ -93,7 +93,7 @@ type MachinePaper = {
 };
 
 type DashboardPageProps = {
-    auth?: { user?: { name?: string } };
+    auth?: { user?: { name?: string, role?: string } };
     stats: DashboardStat[];
     recentActivities: DashboardActivity[];
     performanceTargets: DashboardTarget[];
@@ -115,6 +115,7 @@ export default function Dashboard() {
     const { auth, stats, recentActivities, performanceTargets, transactionChartData, revenueSummary, transactionBreakdown, reportFilters, machinesPaper, activeMachine } =
         usePage<DashboardPageProps & { activeMachine?: { id: number, name: string } }>().props;
     const firstName = auth?.user?.name?.split(' ')[0] ?? 'Tim';
+    const isMitra = auth?.user?.role === 'mitra';
     const maxTransaction = Math.max(1, ...transactionChartData.map((item) => item.total));
     const [startDate, setStartDate] = useState(reportFilters.startDate);
     const [endDate, setEndDate] = useState(reportFilters.endDate);
@@ -172,7 +173,7 @@ export default function Dashboard() {
                     </CardHeader>
                 </Card>
 
-                {lowPaperMachines && lowPaperMachines.length > 0 && (
+                {!isMitra && lowPaperMachines && lowPaperMachines.length > 0 && (
                     <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
                         <div className="flex items-start gap-3">
                             <BellRing className="mt-0.5 h-5 w-5 text-destructive" />
@@ -250,7 +251,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredMachinesPaper && filteredMachinesPaper.length > 0 && (
+                    {!isMitra && filteredMachinesPaper && filteredMachinesPaper.length > 0 && (
                         <Card className="lg:col-span-3">
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -500,7 +501,8 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                {!isMitra && (
+                    <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Sparkles className="h-4 w-4" />
@@ -528,6 +530,7 @@ export default function Dashboard() {
                         </Button>
                     </CardContent>
                 </Card>
+                )}
             </div>
         </>
     );

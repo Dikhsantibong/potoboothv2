@@ -7,6 +7,15 @@ use Illuminate\Support\Str;
 
 class Machine extends Model
 {
+    protected static function booted()
+    {
+        static::addGlobalScope('mitra', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            if (auth()->check() && auth()->user()->isMitra()) {
+                $builder->where($builder->getModel()->getTable() . '.user_id', auth()->id());
+            }
+        });
+    }
+
     protected $fillable = [
         'name',
         'is_active',
@@ -20,6 +29,7 @@ class Machine extends Model
         'amount_print_flipbook',
         'paper_capacity',
         'paper_reset_at',
+        'user_id',
     ];
 
     protected $casts = [
@@ -111,5 +121,10 @@ class Machine extends Model
     public function vouchers()
     {
         return $this->hasMany(Voucher::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

@@ -17,6 +17,11 @@ class TransactionController extends Controller
     {
         $query = Transaction::with(['machine', 'template', 'finalImage'])->latest();
 
+        if (auth()->check() && auth()->user()->isMitra()) {
+            $machineIds = auth()->user()->machines()->pluck('id');
+            $query->whereIn('machine_id', $machineIds);
+        }
+
         // Search by transaction_id or machine name
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
@@ -43,6 +48,13 @@ class TransactionController extends Controller
      */
     public function show(Transaction $transaction): Response
     {
+        if (auth()->check() && auth()->user()->isMitra()) {
+            $machineIds = auth()->user()->machines()->pluck('id')->toArray();
+            if (!in_array($transaction->machine_id, $machineIds)) {
+                abort(403, 'Unauthorized access.');
+            }
+        }
+
         $transaction->load(['machine', 'template', 'photos.frame', 'finalImage', 'voucher']);
 
         return Inertia::render('transactions/show', [

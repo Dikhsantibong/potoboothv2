@@ -40,9 +40,10 @@ class DashboardController extends Controller
         $previousRangeEnd = $rangeStart->copy()->subSecond();
 
         $activeMachineId = session('active_machine_id') ?? Machine::first()?->id ?? 'none';
+        $userRole = auth()->check() && auth()->user()->isMitra() ? 'mitra:' . auth()->id() : 'admin';
 
         $payload = Cache::remember(
-            "dashboard:metrics:{$rangeStart->toDateString()}:{$rangeEnd->toDateString()}:machine:{$activeMachineId}",
+            "dashboard:metrics:{$rangeStart->toDateString()}:{$rangeEnd->toDateString()}:machine:{$activeMachineId}:role:{$userRole}",
             now()->addSeconds($cacheTtlSeconds),
             function () use ($rangeStart, $rangeEnd, $previousRangeStart, $previousRangeEnd) {
                 $successStatus = 'COMPLETED';
