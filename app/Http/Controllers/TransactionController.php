@@ -95,11 +95,13 @@ class TransactionController extends Controller
         $startDate = $request->query('start_date', now()->startOfDay());
         $endDate = $request->query('end_date', now()->endOfDay());
 
-        $transactions = Transaction::with(['machine'])
-            ->forCurrentUser()
+        $transactions = Transaction::forCurrentUser()
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as total_transactions, SUM(amount) as total_amount')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->where('status', 'COMPLETED')
             ->whereRaw('LOWER(payment_type) = ?', ['qris'])
+            ->groupBy('date')
+            ->orderBy('date', 'ASC')
             ->get();
 
         $fileName = 'Laporan_QRIS_' . date('Ymd_His') . '.xlsx';
@@ -108,12 +110,9 @@ class TransactionController extends Controller
 
         foreach ($transactions as $t) {
             $writer->addRow([
-                'ID Transaksi' => $t->transaction_id,
-                'Mesin' => $t->machine ? $t->machine->name : '-',
-                'Tipe Pembayaran' => strtoupper($t->payment_type),
-                'Status' => $t->status,
-                'Total (Rp)' => $t->amount,
-                'Tanggal Transaksi' => $t->created_at->format('Y-m-d H:i:s'),
+                'Tanggal' => $t->date,
+                'Jumlah Transaksi' => $t->total_transactions,
+                'Pendapatan QRIS (Rp)' => $t->total_amount,
             ]);
         }
 
