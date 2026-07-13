@@ -24,9 +24,10 @@ interface Machine {
 }
 
 export function MachineSwitcher() {
-    const { machines, activeMachine } = usePage().props as unknown as { machines: Machine[], activeMachine: Machine | null };
+    const { machines, activeMachine, auth } = usePage().props as unknown as { machines: Machine[], activeMachine: Machine | null, auth: { user: { role: string } } };
     const { isMobile } = useSidebar();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const isMitra = auth?.user?.role === 'mitra';
 
     const handleMachineSelect = (machineId: number) => {
         router.post('/machines/current', { machine_id: machineId }, {
@@ -84,13 +85,17 @@ export function MachineSwitcher() {
                                     )}
                                 </DropdownMenuItem>
                             ))}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="gap-2 p-2" onClick={() => setIsCreateModalOpen(true)}>
-                                <div className="flex size-6 items-center justify-center rounded-md border bg-background">
-                                    <Plus className="size-4" />
-                                </div>
-                                <div className="font-medium text-muted-foreground">Tambah Mesin Baru</div>
-                            </DropdownMenuItem>
+                            {!isMitra && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="gap-2 p-2" onClick={() => setIsCreateModalOpen(true)}>
+                                        <div className="flex size-6 items-center justify-center rounded-md border bg-background">
+                                            <Plus className="size-4" />
+                                        </div>
+                                        <div className="font-medium text-muted-foreground">Tambah Mesin Baru</div>
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </SidebarMenuItem>
