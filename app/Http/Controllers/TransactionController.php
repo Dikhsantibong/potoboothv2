@@ -89,4 +89,56 @@ class TransactionController extends Controller
         return redirect()->route('transactions.index')
             ->with('message', 'Transaction deleted successfully.');
     }
+
+    public function export(Request $request)
+    {
+        $startDate = $request->query('start_date', now()->startOfDay());
+        $endDate = $request->query('end_date', now()->endOfDay());
+
+        $transactions = Transaction::with(['machine'])
+            ->forCurrentUser()
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->where('status', 'COMPLETED')
+            ->whereRaw('LOWER(payment_type) = ?', ['qris'])
+            ->get();
+
+        $fileName = 'Laporan_QRIS_' . date('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ];
+
+        $callback = function () use ($transactions) {
+            $file = fopen('php://output', 'w');
+            // Add BOM for Excel UTF-8 compatibility
+            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            // Headers
+            fputcsv($file, [
+                'ID Transaksi',
+                'Mesin',
+                'Tipe Pembayaran',
+                'Status',
+                'Total (Rp)',
+                'Tanggal Transaksi'
+            ]);
+
+            // Data
+            foreach ($transactions as $t) {
+                fputcsv($file, [
+                    $t->transaction_id,
+                    $t->machine ? $t->machine->name : '-',
+                    strtoupper($t->payment_type),
+                    $t->status,
+                    $t->amount,
+                    $t->created_at->format('Y-m-d H:i:s')
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }

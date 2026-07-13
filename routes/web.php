@@ -17,6 +17,7 @@ Route::inertia('/', 'welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     // Routes available to both admin and mitra
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
     Route::resource('transactions', TransactionController::class)->only(['index', 'show']);
     Route::get('gallery', [GalleryController::class, 'index'])->name('gallery.index');
     Route::post('machines/current', [\App\Http\Controllers\CurrentMachineController::class, 'store'])->name('machines.current');
