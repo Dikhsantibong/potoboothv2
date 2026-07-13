@@ -14,7 +14,9 @@ class Transaction extends Model
     {
         static::addGlobalScope('mitra', function (\Illuminate\Database\Eloquent\Builder $builder) {
             if (auth()->check() && auth()->user()->isMitra()) {
-                $builder->whereIn($builder->getModel()->getTable() . '.machine_id', auth()->user()->machines()->pluck('id'));
+                $builder->whereIn($builder->getModel()->getTable() . '.machine_id', function ($query) {
+                    $query->select('id')->from('machines')->where('user_id', auth()->id());
+                });
             }
         });
     }
