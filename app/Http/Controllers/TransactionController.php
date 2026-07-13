@@ -119,6 +119,23 @@ class TransactionController extends Controller
 
         $isMitra = auth()->check() && auth()->user()->role === 'mitra';
 
+        // Mesin aktif mengikuti MachineScope (pilihan pada machine switcher),
+        // supaya identitas pada laporan sesuai dengan data yang terfilter.
+        $machineQuery = \App\Models\Machine::query()->with('user:id,name');
+        if ($isMitra) {
+            $machineQuery->where('user_id', auth()->id());
+        }
+
+        $activeMachine = null;
+        if ($activeMachineId = session('active_machine_id')) {
+            $activeMachine = (clone $machineQuery)->where('id', $activeMachineId)->first();
+        }
+        $activeMachine ??= (clone $machineQuery)->orderBy('name')->first();
+
+        $machineName = $activeMachine?->name ?? 'Semua Mesin';
+        $mitraName = $activeMachine?->user?->name
+            ?? ($isMitra ? auth()->user()->name : null);
+
         $transactions = Transaction::forCurrentUser()
             ->with('finalImage')
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -167,29 +184,42 @@ class TransactionController extends Controller
 
         $rupiah = fn (int $amount) => 'Rp ' . number_format($amount, 0, ',', '.');
 
-        $fileName = sprintf(
-            'Laporan_%s_%s_sd_%s.xlsx',
+        $slug = fn (?string $value) => trim(preg_replace('/[^A-Za-z0-9]+/', '_', (string) $value), '_');
+
+        $fileNameParts = array_filter([
+            'Laporan',
             $isMitra ? 'QRIS' : 'Transaksi',
-            $startDate->format('Ymd'),
-            $endDate->format('Ymd')
-        );
+            $slug($mitraName),
+            $slug($machineName),
+            $startDate->format('Ymd') . '_sd_' . $endDate->format('Ymd'),
+        ]);
+        $fileName = implode('_', $fileNameParts) . '.xlsx';
 
         $columnCount = $isMitra ? 5 : 8;
-        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::streamDownload($fileName, 'xlsx', function ($spoutWriter, $downloadName) use ($columnCount) {
+
+        // Tulis workbook utuh ke file sementara lalu kirim sebagai download
+        // biasa (dengan Content-Length). Streaming langsung via toBrowser()
+        // mengirim respons tanpa Content-Length dan mengakhiri PHP dengan
+        // exit; di macOS hal ini membuat Excel menganggap file masih dipakai
+        // ("locked for editing") saat dibuka dari download bar.
+        $tempPath = tempnam(sys_get_temp_dir(), 'laporan_export_');
+        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($tempPath, 'xlsx', function ($spoutWriter) use ($columnCount) {
             /** @var \OpenSpout\Writer\XLSX\Writer $spoutWriter */
             $options = $spoutWriter->getOptions();
             $options->setColumnWidth(24, 1);
             for ($col = 2; $col <= $columnCount; $col++) {
                 $options->setColumnWidth(22, $col);
             }
-
-            $spoutWriter->openToBrowser($downloadName);
         })->noHeaderRow();
 
         $bold = (new \OpenSpout\Common\Entity\Style\Style())->setFontBold();
 
         // --- Judul & info periode ---
         $writer->addRow([$isMitra ? 'LAPORAN TRANSAKSI QRIS - POTOPI PHOTOBOOTH' : 'LAPORAN TRANSAKSI - POTOPI PHOTOBOOTH'], $bold);
+        if ($mitraName) {
+            $writer->addRow(['Mitra', $mitraName]);
+        }
+        $writer->addRow(['Mesin', $machineName]);
         $writer->addRow(['Periode', $startDate->format('d/m/Y') . ' s/d ' . $endDate->format('d/m/Y')]);
         $writer->addRow(['Dibuat pada', now($timezone)->format('d/m/Y H:i')]);
         if (! $isMitra) {
@@ -278,6 +308,10 @@ class TransactionController extends Controller
             $writer->addRow(['Total Pendapatan Keseluruhan', $rupiah($totalQris + $totals['voucher_base'])], $bold);
         }
 
-        return $writer->toBrowser();
+        $writer->close();
+
+        return response()->download($tempPath, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
     }
 }
