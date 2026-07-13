@@ -102,43 +102,21 @@ class TransactionController extends Controller
             ->whereRaw('LOWER(payment_type) = ?', ['qris'])
             ->get();
 
-        $fileName = 'Laporan_QRIS_' . date('Ymd_His') . '.csv';
+        $fileName = 'Laporan_QRIS_' . date('Ymd_His') . '.xlsx';
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
-        ];
+        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::streamDownload($fileName);
 
-        $callback = function () use ($transactions) {
-            $file = fopen('php://output', 'w');
-            // Add BOM for Excel UTF-8 compatibility
-            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
-            // Headers
-            fputcsv($file, [
-                'ID Transaksi',
-                'Mesin',
-                'Tipe Pembayaran',
-                'Status',
-                'Total (Rp)',
-                'Tanggal Transaksi'
+        foreach ($transactions as $t) {
+            $writer->addRow([
+                'ID Transaksi' => $t->transaction_id,
+                'Mesin' => $t->machine ? $t->machine->name : '-',
+                'Tipe Pembayaran' => strtoupper($t->payment_type),
+                'Status' => $t->status,
+                'Total (Rp)' => $t->amount,
+                'Tanggal Transaksi' => $t->created_at->format('Y-m-d H:i:s'),
             ]);
+        }
 
-            // Data
-            foreach ($transactions as $t) {
-                fputcsv($file, [
-                    $t->transaction_id,
-                    $t->machine ? $t->machine->name : '-',
-                    strtoupper($t->payment_type),
-                    $t->status,
-                    $t->amount,
-                    $t->created_at->format('Y-m-d H:i:s')
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return $writer->toBrowser();
     }
 }
