@@ -90,30 +90,192 @@ class TransactionController extends Controller
             ->with('message', 'Transaction deleted successfully.');
     }
 
+    /**
+     * Export laporan transaksi ke Excel.
+     *
+     * Angka pada laporan ini dihitung dengan aturan yang SAMA PERSIS dengan
+     * dashboard (DashboardController::computeBreakdown):
+     * - Voucher : transaksi COMPLETED yang memakai voucher (voucher_id terisi).
+     * - QRIS    : transaksi COMPLETED payment_type "qris" TANPA voucher.
+     * - Semua biaya cetak tambahan (termasuk pada sesi voucher) dibayar via
+     *   QRIS sehingga masuk ke kolom pendapatan cetak QRIS.
+     * - Untuk role mitra hanya bagian QRIS yang dihitung dan ditampilkan.
+     */
     public function export(Request $request)
     {
-        $startDate = $request->query('start_date', now()->startOfDay());
-        $endDate = $request->query('end_date', now()->endOfDay());
+        $timezone = config('app.timezone', 'Asia/Jakarta');
+
+        $startDate = $request->filled('start_date')
+            ? \Carbon\Carbon::parse($request->query('start_date'), $timezone)->startOfDay()
+            : now($timezone)->startOfDay();
+
+        $endDate = $request->filled('end_date')
+            ? \Carbon\Carbon::parse($request->query('end_date'), $timezone)->endOfDay()
+            : now($timezone)->endOfDay();
+
+        if ($endDate->lt($startDate)) {
+            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+        }
+
+        $isMitra = auth()->check() && auth()->user()->role === 'mitra';
 
         $transactions = Transaction::forCurrentUser()
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as total_transactions, SUM(amount) as total_amount')
+            ->with('finalImage')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->where('status', 'COMPLETED')
-            ->whereRaw('LOWER(payment_type) = ?', ['qris'])
-            ->groupBy('date')
-            ->orderBy('date', 'ASC')
+            ->orderBy('created_at')
             ->get();
 
-        $fileName = 'Laporan_QRIS_' . date('Ymd_His') . '.xlsx';
-
-        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::streamDownload($fileName);
-
+        // Agregasi per tanggal dengan kategori yang saling eksklusif,
+        // mengikuti aturan perhitungan dashboard.
+        $days = [];
         foreach ($transactions as $t) {
-            $writer->addRow([
-                'Tanggal' => $t->date,
-                'Jumlah Transaksi' => $t->total_transactions,
-                'Pendapatan QRIS (Rp)' => $t->total_amount,
-            ]);
+            $isVoucher = $t->voucher_id !== null;
+            $isQris = ! $isVoucher && strtolower((string) $t->payment_type) === 'qris';
+
+            if (! $isVoucher && ! $isQris) {
+                continue;
+            }
+
+            $dateKey = $t->created_at->format('Y-m-d');
+            if (! isset($days[$dateKey])) {
+                $days[$dateKey] = [
+                    'qris_count' => 0,
+                    'qris_base' => 0,
+                    'qris_print' => 0,
+                    'voucher_count' => 0,
+                    'voucher_base' => 0,
+                ];
+            }
+
+            $printAmount = ($t->finalImage && $t->finalImage->printed && $t->finalImage->amount_print)
+                ? (int) $t->finalImage->amount_print
+                : 0;
+
+            if ($isVoucher) {
+                $days[$dateKey]['voucher_count']++;
+                $days[$dateKey]['voucher_base'] += (int) $t->amount;
+                // Cetak tambahan pada sesi voucher dibayar via QRIS.
+                $days[$dateKey]['qris_print'] += $printAmount;
+            } else {
+                $days[$dateKey]['qris_count']++;
+                $days[$dateKey]['qris_base'] += (int) $t->amount;
+                $days[$dateKey]['qris_print'] += $printAmount;
+            }
+        }
+        ksort($days);
+
+        $rupiah = fn (int $amount) => 'Rp ' . number_format($amount, 0, ',', '.');
+
+        $fileName = sprintf(
+            'Laporan_%s_%s_sd_%s.xlsx',
+            $isMitra ? 'QRIS' : 'Transaksi',
+            $startDate->format('Ymd'),
+            $endDate->format('Ymd')
+        );
+
+        $columnCount = $isMitra ? 5 : 8;
+        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::streamDownload($fileName, 'xlsx', function ($spoutWriter, $downloadName) use ($columnCount) {
+            /** @var \OpenSpout\Writer\XLSX\Writer $spoutWriter */
+            $options = $spoutWriter->getOptions();
+            $options->setColumnWidth(24, 1);
+            for ($col = 2; $col <= $columnCount; $col++) {
+                $options->setColumnWidth(22, $col);
+            }
+
+            $spoutWriter->openToBrowser($downloadName);
+        })->noHeaderRow();
+
+        $bold = (new \OpenSpout\Common\Entity\Style\Style())->setFontBold();
+
+        // --- Judul & info periode ---
+        $writer->addRow([$isMitra ? 'LAPORAN TRANSAKSI QRIS - POTOPI PHOTOBOOTH' : 'LAPORAN TRANSAKSI - POTOPI PHOTOBOOTH'], $bold);
+        $writer->addRow(['Periode', $startDate->format('d/m/Y') . ' s/d ' . $endDate->format('d/m/Y')]);
+        $writer->addRow(['Dibuat pada', now($timezone)->format('d/m/Y H:i')]);
+        if (! $isMitra) {
+            $writer->addRow(['Catatan', 'Semua biaya cetak tambahan (termasuk dari sesi voucher) dibayar via QRIS dan masuk kolom Pendapatan Cetak.']);
+        }
+        $writer->addRow(['']);
+
+        // --- Header tabel ---
+        $header = [
+            'Tanggal',
+            'Jumlah Transaksi QRIS',
+            'Pendapatan Sesi QRIS',
+            'Pendapatan Cetak (QRIS)',
+            'Total QRIS',
+        ];
+        if (! $isMitra) {
+            $header[] = 'Jumlah Transaksi Voucher';
+            $header[] = 'Nilai Sesi Voucher';
+            $header[] = 'Total Pendapatan';
+        }
+        $writer->addRow($header, $bold);
+
+        // --- Baris data per tanggal ---
+        $totals = [
+            'qris_count' => 0,
+            'qris_base' => 0,
+            'qris_print' => 0,
+            'voucher_count' => 0,
+            'voucher_base' => 0,
+        ];
+
+        foreach ($days as $date => $d) {
+            $qrisTotal = $d['qris_base'] + $d['qris_print'];
+
+            foreach ($totals as $key => $value) {
+                $totals[$key] += $d[$key];
+            }
+
+            $row = [
+                \Carbon\Carbon::parse($date)->format('d/m/Y'),
+                $d['qris_count'],
+                $rupiah($d['qris_base']),
+                $rupiah($d['qris_print']),
+                $rupiah($qrisTotal),
+            ];
+            if (! $isMitra) {
+                $row[] = $d['voucher_count'];
+                $row[] = $rupiah($d['voucher_base']);
+                $row[] = $rupiah($qrisTotal + $d['voucher_base']);
+            }
+            $writer->addRow($row);
+        }
+
+        if (empty($days)) {
+            $writer->addRow(['Tidak ada transaksi pada periode ini.']);
+        }
+
+        // --- Baris total ---
+        $totalQris = $totals['qris_base'] + $totals['qris_print'];
+
+        $writer->addRow(['']);
+        $totalRow = [
+            'TOTAL',
+            $totals['qris_count'],
+            $rupiah($totals['qris_base']),
+            $rupiah($totals['qris_print']),
+            $rupiah($totalQris),
+        ];
+        if (! $isMitra) {
+            $totalRow[] = $totals['voucher_count'];
+            $totalRow[] = $rupiah($totals['voucher_base']);
+            $totalRow[] = $rupiah($totalQris + $totals['voucher_base']);
+        }
+        $writer->addRow($totalRow, $bold);
+
+        // --- Ringkasan (sama dengan kartu di dashboard) ---
+        $writer->addRow(['']);
+        $writer->addRow(['RINGKASAN PERIODE'], $bold);
+        $writer->addRow(['Total Transaksi QRIS', $totals['qris_count']]);
+        $writer->addRow(['Pendapatan Sesi QRIS', $rupiah($totals['qris_base'])]);
+        $writer->addRow(['Pendapatan Cetak Tambahan (QRIS)', $rupiah($totals['qris_print'])]);
+        $writer->addRow(['Total Pendapatan QRIS', $rupiah($totalQris)], $bold);
+        if (! $isMitra) {
+            $writer->addRow(['Total Transaksi Voucher', $totals['voucher_count']]);
+            $writer->addRow(['Nilai Sesi Voucher', $rupiah($totals['voucher_base'])]);
+            $writer->addRow(['Total Pendapatan Keseluruhan', $rupiah($totalQris + $totals['voucher_base'])], $bold);
         }
 
         return $writer->toBrowser();

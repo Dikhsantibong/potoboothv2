@@ -55,27 +55,34 @@ type DashboardChartPoint = {
 };
 
 type RevenueSummary = {
-    today: string;
-    yesterday: string;
-    thisWeek: string;
-    thisMonth: string;
-    total: string;
+    periodRevenue: string;
+    previousPeriodRevenue: string;
+    transactionCount: string;
+    successRate: string;
+    allTimeRevenue: string;
     periodLabel: string;
     previousPeriodLabel: string;
+    note: string;
 };
 
-type BreakdownItem = {
+type QrisBreakdown = {
+    count: number;
+    base: string;
+    print: string;
+    total: string;
+};
+
+type VoucherBreakdown = {
     count: number;
     total: string;
-    totalRaw?: number;
-};
+} | null;
 
 type TransactionBreakdown = {
-    qris: BreakdownItem;
-    voucher: BreakdownItem;
+    qris: QrisBreakdown;
+    voucher: VoucherBreakdown;
     allTime: {
-        qris: { count: number; total: string };
-        voucher: { count: number; total: string };
+        qris: QrisBreakdown;
+        voucher: VoucherBreakdown;
     };
 };
 
@@ -229,15 +236,15 @@ export default function Dashboard() {
                             <Button variant="outline" onClick={resetDateFilter}>Reset</Button>
                             <Button variant="secondary" asChild>
                                 <a href={`/transactions/export?start_date=${startDate}&end_date=${endDate}`}>
-                                    Export Laporan QRIS
+                                    Export Laporan Excel
                                 </a>
                             </Button>
                         </div>
                     </CardContent>
                 </Card>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    {stats.filter(item => isMitra ? item.title !== 'Voucher Dipakai' : true).map((item) => {
+                <div className={`grid gap-4 md:grid-cols-2 ${isMitra ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
+                    {stats.map((item) => {
                         const Icon = iconMap[item.icon] ?? CreditCard;
 
                         return (
@@ -296,7 +303,9 @@ export default function Dashboard() {
                             Grafik Transaksi (7 Hari Terakhir)
                         </CardTitle>
                         <CardDescription>
-                            Tren jumlah transaksi harian selama satu minggu terakhir.
+                            {isMitra
+                                ? 'Tren jumlah transaksi QRIS harian selama satu minggu terakhir.'
+                                : 'Tren jumlah transaksi harian selama satu minggu terakhir.'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -368,73 +377,101 @@ export default function Dashboard() {
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
                                 <div className="space-y-1">
                                     <p className="text-sm font-medium text-muted-foreground">Pendapatan Periode</p>
-                                    <p className="text-xl font-bold">{revenueSummary.today}</p>
+                                    <p className="text-xl font-bold">{revenueSummary.periodRevenue}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-sm font-medium text-muted-foreground">Periode Sebelumnya</p>
-                                    <p className="text-xl font-bold">{revenueSummary.yesterday}</p>
+                                    <p className="text-xl font-bold">{revenueSummary.previousPeriodRevenue}</p>
                                     <p className="text-xs text-muted-foreground">{revenueSummary.previousPeriodLabel}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-sm font-medium text-muted-foreground">Jumlah Transaksi</p>
-                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{revenueSummary.thisWeek}</p>
+                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{revenueSummary.transactionCount}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{revenueSummary.thisMonth}</p>
+                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{revenueSummary.successRate}</p>
                                 </div>
                                 <div className="space-y-1 border-t md:border-l md:border-t-0 md:pl-4 pt-2 md:pt-0 col-span-2 md:col-span-1 border-border">
-                                    <p className="text-sm font-medium text-muted-foreground">Total Keseluruhan</p>
-                                    <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{revenueSummary.total}</p>
+                                    <p className="text-sm font-medium text-muted-foreground">Total Keseluruhan (All-Time)</p>
+                                    <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{revenueSummary.allTimeRevenue}</p>
                                 </div>
                             </div>
+                            <p className="mt-4 rounded-md bg-blue-100/60 px-3 py-2 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                                ℹ️ {revenueSummary.note}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
 
                 {/* --- QRIS & Voucher Breakdown --- */}
-                <div className={isMitra ? "grid gap-4 md:grid-cols-1" : "grid gap-4 md:grid-cols-2"}>
+                <div className={transactionBreakdown.voucher ? "grid gap-4 md:grid-cols-2" : "grid gap-4 md:grid-cols-1"}>
                     {/* QRIS Card */}
                     <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <QrCode className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                Transaksi QRIS
+                                Pendapatan QRIS
                             </CardTitle>
                             <CardDescription>
-                                Akumulasi transaksi via pembayaran QRIS
+                                Uang masuk via pembayaran QRIS pada periode {revenueSummary.periodLabel}
+                                {isMitra && ' — dasar perhitungan bagi hasil'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Jumlah (Periode)</p>
+                                    <p className="text-sm font-medium text-muted-foreground">Jumlah Transaksi</p>
                                     <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{transactionBreakdown.qris.count}</p>
-                                    <p className="text-xs text-muted-foreground">transaksi</p>
+                                    <p className="text-xs text-muted-foreground">transaksi sukses</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Total (Periode)</p>
-                                    <p className="text-2xl font-bold">{transactionBreakdown.qris.total}</p>
+                                    <p className="text-sm font-medium text-muted-foreground">Pendapatan Sesi</p>
+                                    <p className="text-lg font-bold">{transactionBreakdown.qris.base}</p>
+                                    <p className="text-xs text-muted-foreground">pembayaran sesi photo booth</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Pendapatan Cetak</p>
+                                    <p className="text-lg font-bold">{transactionBreakdown.qris.print}</p>
+                                    <p className="text-xs text-muted-foreground">cetak tambahan (dibayar via QRIS)</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Total QRIS</p>
+                                    <p className="text-2xl font-black text-purple-700 dark:text-purple-300">{transactionBreakdown.qris.total}</p>
+                                    <p className="text-xs text-muted-foreground">sesi + cetak</p>
                                 </div>
                             </div>
                             <div className="mt-4 border-t pt-3 border-border">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Akumulasi Keseluruhan</p>
-                                <div className="grid grid-cols-2 gap-4">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Akumulasi Keseluruhan (All-Time)</p>
+                                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                     <div className="space-y-0.5">
-                                        <p className="text-xs text-muted-foreground">Total Transaksi</p>
+                                        <p className="text-xs text-muted-foreground">Jumlah Transaksi</p>
                                         <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{transactionBreakdown.allTime.qris.count}</p>
                                     </div>
                                     <div className="space-y-0.5">
-                                        <p className="text-xs text-muted-foreground">Total Pendapatan</p>
+                                        <p className="text-xs text-muted-foreground">Pendapatan Sesi</p>
+                                        <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{transactionBreakdown.allTime.qris.base}</p>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-xs text-muted-foreground">Pendapatan Cetak</p>
+                                        <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{transactionBreakdown.allTime.qris.print}</p>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-xs text-muted-foreground">Total QRIS</p>
                                         <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{transactionBreakdown.allTime.qris.total}</p>
                                     </div>
                                 </div>
                             </div>
+                            <p className="mt-4 rounded-md bg-purple-100/60 px-3 py-2 text-xs text-purple-800 dark:bg-purple-900/30 dark:text-purple-200">
+                                ℹ️ Semua biaya cetak tambahan dibayar via QRIS
+                                {!isMitra && ', termasuk cetak tambahan dari sesi voucher,'}
+                                {' '}sehingga masuk ke perhitungan QRIS.
+                            </p>
                         </CardContent>
                     </Card>
 
-                    {/* Voucher Card */}
-                    {!isMitra && (
+                    {/* Voucher Card — hanya dikirim server untuk admin */}
+                    {transactionBreakdown.voucher && transactionBreakdown.allTime.voucher && (
                         <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-lg flex items-center gap-2">
@@ -442,34 +479,37 @@ export default function Dashboard() {
                                     Transaksi Voucher
                                 </CardTitle>
                                 <CardDescription>
-                                    Akumulasi transaksi menggunakan voucher
+                                    Sesi yang dibayar menggunakan voucher pada periode terpilih
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <p className="text-sm font-medium text-muted-foreground">Jumlah (Periode)</p>
+                                        <p className="text-sm font-medium text-muted-foreground">Jumlah Transaksi</p>
                                         <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{transactionBreakdown.voucher.count}</p>
-                                        <p className="text-xs text-muted-foreground">transaksi</p>
+                                        <p className="text-xs text-muted-foreground">transaksi sukses</p>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-sm font-medium text-muted-foreground">Total (Periode)</p>
+                                        <p className="text-sm font-medium text-muted-foreground">Nilai Sesi Voucher</p>
                                         <p className="text-2xl font-bold">{transactionBreakdown.voucher.total}</p>
                                     </div>
                                 </div>
                                 <div className="mt-4 border-t pt-3 border-border">
-                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Akumulasi Keseluruhan</p>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Akumulasi Keseluruhan (All-Time)</p>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-0.5">
-                                            <p className="text-xs text-muted-foreground">Total Transaksi</p>
+                                            <p className="text-xs text-muted-foreground">Jumlah Transaksi</p>
                                             <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{transactionBreakdown.allTime.voucher.count}</p>
                                         </div>
                                         <div className="space-y-0.5">
-                                            <p className="text-xs text-muted-foreground">Total Pendapatan</p>
+                                            <p className="text-xs text-muted-foreground">Nilai Sesi Voucher</p>
                                             <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{transactionBreakdown.allTime.voucher.total}</p>
                                         </div>
                                     </div>
                                 </div>
+                                <p className="mt-4 rounded-md bg-amber-100/60 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                                    ℹ️ Cetak tambahan pada sesi voucher dibayar via QRIS dan tercatat di kartu Pendapatan QRIS. Bagian voucher tidak dihitung dalam bagi hasil mitra.
+                                </p>
                             </CardContent>
                         </Card>
                     )}

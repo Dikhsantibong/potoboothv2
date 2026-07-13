@@ -15,6 +15,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    private const SUCCESS_STATUS = 'COMPLETED';
+
     public function __invoke(Request $request): Response
     {
         $timezone = config('app.timezone', 'Asia/Jakarta');
@@ -39,61 +41,72 @@ class DashboardController extends Controller
         $previousRangeStart = $rangeStart->copy()->subDays($rangeDays);
         $previousRangeEnd = $rangeStart->copy()->subSecond();
 
+        $isMitra = auth()->check() && auth()->user()->role === 'mitra';
         $activeMachineId = session('active_machine_id') ?? Machine::forCurrentUser()->first()?->id ?? 'none';
-        $userRole = auth()->check() && auth()->user()->role === 'mitra' ? 'mitra:' . auth()->id() : 'admin';
+        $userRole = $isMitra ? 'mitra:' . auth()->id() : 'admin';
 
         $payload = Cache::remember(
             "dashboard:metrics:{$rangeStart->toDateString()}:{$rangeEnd->toDateString()}:machine:{$activeMachineId}:role:{$userRole}",
             now()->addSeconds($cacheTtlSeconds),
-            function () use ($rangeStart, $rangeEnd, $previousRangeStart, $previousRangeEnd) {
-                $successStatus = 'COMPLETED';
+            function () use ($rangeStart, $rangeEnd, $previousRangeStart, $previousRangeEnd, $isMitra) {
+                $period = $this->computeBreakdown($rangeStart, $rangeEnd);
+                $previous = $this->computeBreakdown($previousRangeStart, $previousRangeEnd);
+                $allTime = $this->computeBreakdown(null, null);
 
-                $periodTransactions = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])->count();
-                $previousPeriodTransactions = Transaction::forCurrentUser()->whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])->count();
+                // Mitra hanya berbagi hasil dari uang QRIS; admin melihat semuanya.
+                $periodRevenue = $isMitra ? $period['qrisTotal'] : $period['grandTotal'];
+                $previousRevenue = $isMitra ? $previous['qrisTotal'] : $previous['grandTotal'];
+                $allTimeRevenue = $isMitra ? $allTime['qrisTotal'] : $allTime['grandTotal'];
 
-                $periodRevenue = (int) $this->revenueQuery(
-                    Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
-                        ->where('status', $successStatus)
-                );
-                $previousPeriodRevenue = (int) $this->revenueQuery(
-                    Transaction::forCurrentUser()->whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])
-                        ->where('status', $successStatus)
-                );
+                $periodTransactions = $this->activityQuery($isMitra)
+                    ->whereBetween('created_at', [$rangeStart, $rangeEnd])
+                    ->count();
+                $previousPeriodTransactions = $this->activityQuery($isMitra)
+                    ->whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])
+                    ->count();
+                $successTransactions = $this->activityQuery($isMitra)
+                    ->whereBetween('created_at', [$rangeStart, $rangeEnd])
+                    ->where('status', self::SUCCESS_STATUS)
+                    ->count();
+                $successRate = $periodTransactions > 0
+                    ? round(($successTransactions / $periodTransactions) * 100)
+                    : 0;
 
                 $periodSessions = Transaction::forCurrentUser()->whereBetween('started_at', [$rangeStart, $rangeEnd])->count();
-                $periodVoucherUsage = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
-                    ->whereNotNull('voucher_id')
-                    ->count();
-                $activeVoucherCount = Voucher::where('status', 'ready')->count();
 
                 $stats = [
                     [
-                        'title' => 'Transaksi Periode',
+                        'title' => $isMitra ? 'Transaksi QRIS (Periode)' : 'Transaksi Periode',
                         'value' => (string) $periodTransactions,
                         'change' => $this->formatChange($periodTransactions, $previousPeriodTransactions, 'vs periode sebelumnya'),
                         'icon' => 'credit-card',
                     ],
                     [
-                        'title' => 'Pendapatan Periode',
-                        'value' => 'Rp ' . number_format($periodRevenue, 0, ',', '.'),
-                        'change' => $this->formatChange($periodRevenue, $previousPeriodRevenue, 'vs periode sebelumnya'),
+                        'title' => $isMitra ? 'Pendapatan QRIS (Periode)' : 'Pendapatan Periode',
+                        'value' => $this->formatRupiah($periodRevenue),
+                        'change' => $this->formatChange($periodRevenue, $previousRevenue, 'vs periode sebelumnya'),
                         'icon' => 'dollar-sign',
                     ],
                     [
                         'title' => 'Sesi Photo Booth',
                         'value' => (string) $periodSessions,
-                        'change' => 'Berdasarkan started_at di periode terpilih',
+                        'change' => 'Sesi yang dimulai pada periode terpilih',
                         'icon' => 'camera',
-                    ],
-                    [
-                        'title' => 'Voucher Dipakai',
-                        'value' => (string) $periodVoucherUsage,
-                        'change' => $activeVoucherCount . ' voucher ready',
-                        'icon' => 'ticket',
                     ],
                 ];
 
-                $recentActivities = Transaction::forCurrentUser()->with(['machine:id,name', 'template:id,name'])
+                if (! $isMitra) {
+                    $activeVoucherCount = Voucher::where('status', 'ready')->count();
+                    $stats[] = [
+                        'title' => 'Voucher Dipakai',
+                        'value' => (string) $period['voucherCount'],
+                        'change' => $activeVoucherCount . ' voucher ready',
+                        'icon' => 'ticket',
+                    ];
+                }
+
+                $recentActivities = $this->activityQuery($isMitra)
+                    ->with(['machine:id,name', 'template:id,name'])
                     ->whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->latest()
                     ->limit(4)
@@ -112,91 +125,48 @@ class DashboardController extends Controller
                     ->values()
                     ->all();
 
-                $previousPeriodLabel = sprintf(
-                    '%s - %s',
-                    $previousRangeStart->translatedFormat('d M Y'),
-                    $previousRangeEnd->translatedFormat('d M Y')
-                );
-                $selectedPeriodLabel = sprintf(
-                    '%s - %s',
-                    $rangeStart->translatedFormat('d M Y'),
-                    $rangeEnd->translatedFormat('d M Y')
-                );
-                $successTransactions = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
-                    ->where('status', $successStatus)
-                    ->count();
-                $successRate = $periodTransactions > 0
-                    ? round(($successTransactions / $periodTransactions) * 100)
-                    : 0;
-
-                $totalRevenue = (int) $this->revenueQuery(
-                    Transaction::forCurrentUser()->where('status', $successStatus)
-                );
-
                 $revenueSummary = [
-                    'today' => 'Rp ' . number_format($periodRevenue, 0, ',', '.'),
-                    'yesterday' => 'Rp ' . number_format($previousPeriodRevenue, 0, ',', '.'),
-                    'thisWeek' => (string) $periodTransactions,
-                    'thisMonth' => $successRate . '%',
-                    'total' => 'Rp ' . number_format($totalRevenue, 0, ',', '.'),
-                    'periodLabel' => $selectedPeriodLabel,
-                    'previousPeriodLabel' => $previousPeriodLabel,
+                    'periodRevenue' => $this->formatRupiah($periodRevenue),
+                    'previousPeriodRevenue' => $this->formatRupiah($previousRevenue),
+                    'transactionCount' => (string) $periodTransactions,
+                    'successRate' => $successRate . '%',
+                    'allTimeRevenue' => $this->formatRupiah($allTimeRevenue),
+                    'periodLabel' => sprintf(
+                        '%s - %s',
+                        $rangeStart->translatedFormat('d M Y'),
+                        $rangeEnd->translatedFormat('d M Y')
+                    ),
+                    'previousPeriodLabel' => sprintf(
+                        '%s - %s',
+                        $previousRangeStart->translatedFormat('d M Y'),
+                        $previousRangeEnd->translatedFormat('d M Y')
+                    ),
+                    'note' => $isMitra
+                        ? 'Pendapatan = pembayaran sesi QRIS + cetak tambahan (dibayar via QRIS).'
+                        : 'Pendapatan = Total QRIS (sesi + semua cetak tambahan) + nilai sesi voucher.',
                 ];
-
-                // --- QRIS & Voucher transaction breakdown ---
-                $qrisQuery = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
-                    ->where('status', $successStatus)
-                    ->whereRaw('LOWER(payment_type) = ?', ['qris']);
-                $qrisCount = (clone $qrisQuery)->count();
-                $qrisBase = (int) (clone $qrisQuery)->sum('amount');
-                $qrisPrint = $this->printRevenueOnly(clone $qrisQuery);
-
-                $voucherQuery = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
-                    ->where('status', $successStatus)
-                    ->whereNotNull('voucher_id');
-                $voucherCount = (clone $voucherQuery)->count();
-                $voucherBase = (int) (clone $voucherQuery)->sum('amount');
-                $voucherPrint = $this->printRevenueOnly(clone $voucherQuery);
-
-                // Add ALL extra prints (including from voucher sessions) to QRIS
-                $qrisTotal = $qrisBase + $qrisPrint + $voucherPrint;
-                $voucherTotal = $voucherBase; // Voucher only gets base session
-
-                // All-time accumulated
-                $allQrisQuery = Transaction::forCurrentUser()->where('status', $successStatus)
-                    ->whereRaw('LOWER(payment_type) = ?', ['qris']);
-                $allQrisCount = (clone $allQrisQuery)->count();
-                $allQrisBase = (int) (clone $allQrisQuery)->sum('amount');
-                $allQrisPrint = $this->printRevenueOnly(clone $allQrisQuery);
-
-                $allVoucherQuery = Transaction::forCurrentUser()->where('status', $successStatus)
-                    ->whereNotNull('voucher_id');
-                $allVoucherCount = (clone $allVoucherQuery)->count();
-                $allVoucherBase = (int) (clone $allVoucherQuery)->sum('amount');
-                $allVoucherPrint = $this->printRevenueOnly(clone $allVoucherQuery);
-
-                $allQrisTotal = $allQrisBase + $allQrisPrint + $allVoucherPrint;
-                $allVoucherTotal = $allVoucherBase;
 
                 $transactionBreakdown = [
                     'qris' => [
-                        'count' => $qrisCount,
-                        'total' => 'Rp ' . number_format($qrisTotal, 0, ',', '.'),
-                        'totalRaw' => $qrisTotal,
+                        'count' => $period['qrisCount'],
+                        'base' => $this->formatRupiah($period['qrisBase']),
+                        'print' => $this->formatRupiah($period['qrisPrint']),
+                        'total' => $this->formatRupiah($period['qrisTotal']),
                     ],
-                    'voucher' => [
-                        'count' => $voucherCount,
-                        'total' => 'Rp ' . number_format($voucherTotal, 0, ',', '.'),
-                        'totalRaw' => $voucherTotal,
+                    'voucher' => $isMitra ? null : [
+                        'count' => $period['voucherCount'],
+                        'total' => $this->formatRupiah($period['voucherTotal']),
                     ],
                     'allTime' => [
                         'qris' => [
-                            'count' => $allQrisCount,
-                            'total' => 'Rp ' . number_format($allQrisTotal, 0, ',', '.'),
+                            'count' => $allTime['qrisCount'],
+                            'base' => $this->formatRupiah($allTime['qrisBase']),
+                            'print' => $this->formatRupiah($allTime['qrisPrint']),
+                            'total' => $this->formatRupiah($allTime['qrisTotal']),
                         ],
-                        'voucher' => [
-                            'count' => $allVoucherCount,
-                            'total' => 'Rp ' . number_format($allVoucherTotal, 0, ',', '.'),
+                        'voucher' => $isMitra ? null : [
+                            'count' => $allTime['voucherCount'],
+                            'total' => $this->formatRupiah($allTime['voucherTotal']),
                         ],
                     ],
                 ];
@@ -204,8 +174,8 @@ class DashboardController extends Controller
                 return [
                     'stats' => $stats,
                     'recentActivities' => $recentActivities,
-                    'performanceTargets' => $this->buildPerformanceTargets($rangeStart, $rangeEnd),
-                    'transactionChartData' => $this->buildRangeTransactionChart(now()->subDays(6)->startOfDay(), now()->endOfDay()),
+                    'performanceTargets' => $this->buildPerformanceTargets($periodTransactions, $periodRevenue),
+                    'transactionChartData' => $this->buildRangeTransactionChart(now()->subDays(6)->startOfDay(), now()->endOfDay(), $isMitra),
                     'revenueSummary' => $revenueSummary,
                     'transactionBreakdown' => $transactionBreakdown,
                 ];
@@ -238,6 +208,82 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * Hitung rincian pendapatan QRIS & voucher untuk satu rentang tanggal.
+     *
+     * Kategori dibuat saling eksklusif supaya tidak ada transaksi yang
+     * terhitung dua kali:
+     * - Voucher : transaksi COMPLETED yang memakai voucher (voucher_id terisi).
+     * - QRIS    : transaksi COMPLETED dengan payment_type "qris" TANPA voucher.
+     *
+     * Semua biaya cetak tambahan (final_images.amount_print, printed = true)
+     * dibayar lewat QRIS — termasuk cetak tambahan pada sesi voucher — sehingga
+     * seluruh nilai cetak masuk ke bucket QRIS.
+     *
+     * @return array{qrisCount:int,qrisBase:int,qrisPrint:int,qrisTotal:int,voucherCount:int,voucherBase:int,voucherTotal:int,grandTotal:int}
+     */
+    private function computeBreakdown(?Carbon $start, ?Carbon $end): array
+    {
+        $completed = function () use ($start, $end) {
+            $query = Transaction::forCurrentUser()->where('status', self::SUCCESS_STATUS);
+
+            if ($start && $end) {
+                $query->whereBetween('created_at', [$start, $end]);
+            }
+
+            return $query;
+        };
+
+        $qrisQuery = $this->qrisOnly($completed());
+        $voucherQuery = $completed()->whereNotNull('voucher_id');
+
+        $qrisCount = (clone $qrisQuery)->count();
+        $qrisBase = (int) (clone $qrisQuery)->sum('amount');
+        $qrisOwnPrint = $this->printRevenueOnly($qrisQuery);
+
+        $voucherCount = (clone $voucherQuery)->count();
+        $voucherBase = (int) (clone $voucherQuery)->sum('amount');
+        $voucherPrint = $this->printRevenueOnly($voucherQuery);
+
+        $qrisPrint = $qrisOwnPrint + $voucherPrint;
+        $qrisTotal = $qrisBase + $qrisPrint;
+        $voucherTotal = $voucherBase;
+
+        return [
+            'qrisCount' => $qrisCount,
+            'qrisBase' => $qrisBase,
+            'qrisPrint' => $qrisPrint,
+            'qrisTotal' => $qrisTotal,
+            'voucherCount' => $voucherCount,
+            'voucherBase' => $voucherBase,
+            'voucherTotal' => $voucherTotal,
+            'grandTotal' => $qrisTotal + $voucherTotal,
+        ];
+    }
+
+    /**
+     * Query dasar untuk metrik aktivitas (semua status).
+     * Mitra hanya melihat aktivitas transaksi QRIS.
+     */
+    private function activityQuery(bool $isMitra)
+    {
+        $query = Transaction::forCurrentUser();
+
+        return $isMitra ? $this->qrisOnly($query) : $query;
+    }
+
+    private function qrisOnly($query)
+    {
+        return $query
+            ->whereRaw('LOWER(payment_type) = ?', ['qris'])
+            ->whereNull('voucher_id');
+    }
+
+    private function formatRupiah(int $amount): string
+    {
+        return 'Rp ' . number_format($amount, 0, ',', '.');
+    }
+
     private function formatChange(int $today, int $yesterday, string $suffix): string
     {
         if ($yesterday === 0) {
@@ -255,22 +301,17 @@ class DashboardController extends Controller
         return "{$sign}{$rounded}% {$suffix}";
     }
 
-    private function buildPerformanceTargets(Carbon $todayStart, Carbon $todayEnd): array
+    private function buildPerformanceTargets(int $periodTransactionCount, int $periodRevenue): array
     {
         $transactionTarget = (int) config('dashboard.targets.transactions_per_day', 100);
         $revenueTarget = (int) config('dashboard.targets.revenue_per_day', 5000000);
         $uptimeTarget = (int) config('dashboard.targets.machine_uptime_percent', 95);
 
-        $todayTransactionCount = Transaction::forCurrentUser()->whereBetween('created_at', [$todayStart, $todayEnd])->count();
-        $todayRevenue = (int) $this->revenueQuery(
-            Transaction::forCurrentUser()->whereBetween('created_at', [$todayStart, $todayEnd])
-                ->where('status', 'COMPLETED')
-        );
         $activeMachines = Machine::forCurrentUser()->where('is_active', true)->count();
         $totalMachines = Machine::forCurrentUser()->count();
 
-        $transactionProgress = max(0, min(100, (int) round(($todayTransactionCount / max(1, $transactionTarget)) * 100)));
-        $revenueProgress = max(0, min(100, (int) round(($todayRevenue / max(1, $revenueTarget)) * 100)));
+        $transactionProgress = max(0, min(100, (int) round(($periodTransactionCount / max(1, $transactionTarget)) * 100)));
+        $revenueProgress = max(0, min(100, (int) round(($periodRevenue / max(1, $revenueTarget)) * 100)));
         $uptimeProgress = $totalMachines > 0
             ? max(0, min(100, (int) round(($activeMachines / $totalMachines) * 100)))
             : $uptimeTarget;
@@ -282,9 +323,9 @@ class DashboardController extends Controller
         ];
     }
 
-    private function buildRangeTransactionChart(\Carbon\CarbonInterface $rangeStart, \Carbon\CarbonInterface $rangeEnd): array
+    private function buildRangeTransactionChart(\Carbon\CarbonInterface $rangeStart, \Carbon\CarbonInterface $rangeEnd, bool $isMitra): array
     {
-        $raw = Transaction::forCurrentUser()->select(
+        $raw = $this->activityQuery($isMitra)->select(
             DB::raw('DATE(created_at) as date'),
             DB::raw('COUNT(*) as total')
         )
@@ -308,23 +349,9 @@ class DashboardController extends Controller
     }
 
     /**
-     * Calculate total revenue (session amount + print costs) for a given query.
-     *
-     * Revenue = SUM(transactions.amount) + SUM(final_images.amount_print)
-     *
-     * Uses a subquery approach instead of JOIN to avoid column ambiguity
-     * (both transactions and final_images have created_at columns).
-     */
-    private function revenueQuery($query): int
-    {
-        $baseAmount = (int) (clone $query)->sum('transactions.amount');
-        $printRevenue = $this->printRevenueOnly($query);
-
-        return $baseAmount + $printRevenue;
-    }
-
-    /**
-     * Calculate only the print revenue for a given query.
+     * Total pendapatan cetak (final_images.amount_print) untuk transaksi
+     * pada query yang diberikan. Hanya cetakan yang benar-benar dicetak
+     * (printed = true) yang dihitung.
      */
     private function printRevenueOnly($query): int
     {
