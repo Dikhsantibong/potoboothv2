@@ -284,6 +284,70 @@ export default function Dashboard() {
                     )}
                 </div>
 
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <TrendingUp className="h-4 w-4" />
+                            Grafik Transaksi (7 Hari Terakhir)
+                        </CardTitle>
+                        <CardDescription>
+                            Tren jumlah transaksi harian selama satu minggu terakhir.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="w-full h-[180px] relative mt-2">
+                            {transactionChartData.length > 0 ? (
+                                <>
+                                    <svg viewBox="0 0 800 140" className="w-full h-[140px] overflow-visible" preserveAspectRatio="none">
+                                        <defs>
+                                            <linearGradient id="line-gradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" className="text-primary" stopColor="currentColor" stopOpacity="0.3" />
+                                                <stop offset="100%" className="text-primary" stopColor="currentColor" stopOpacity="0" />
+                                            </linearGradient>
+                                        </defs>
+                                        <path
+                                            d={`M 0,140 L 0,${140 - (transactionChartData[0]?.total / maxTransaction) * 120} ` + 
+                                                transactionChartData.map((p, i) => `L ${(i / Math.max(1, transactionChartData.length - 1)) * 800},${140 - (p.total / maxTransaction) * 120}`).join(' ') + 
+                                                ` L 800,140 Z`}
+                                            fill="url(#line-gradient)"
+                                        />
+                                        <polyline
+                                            points={transactionChartData.map((p, i) => `${(i / Math.max(1, transactionChartData.length - 1)) * 800},${140 - (p.total / maxTransaction) * 120}`).join(' ')}
+                                            fill="none"
+                                            className="stroke-primary"
+                                            strokeWidth="3"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                        {transactionChartData.map((p, i) => (
+                                            <circle
+                                                key={i}
+                                                cx={(i / Math.max(1, transactionChartData.length - 1)) * 800}
+                                                cy={140 - (p.total / maxTransaction) * 120}
+                                                r="4"
+                                                className="fill-background stroke-primary"
+                                                strokeWidth="2.5"
+                                            />
+                                        ))}
+                                    </svg>
+                                    <div className="flex justify-between w-full mt-3">
+                                        {transactionChartData.map((p, i) => (
+                                            <div key={i} className="flex flex-col items-center">
+                                                <span className="text-[10px] font-medium mb-0.5">{p.total}</span>
+                                                <span className="text-xs text-muted-foreground">{p.day}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex h-[140px] items-center justify-center text-muted-foreground rounded-lg border border-dashed text-sm">
+                                    Belum ada data transaksi untuk ditampilkan.
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <div className="grid gap-4">
                     <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
                         <CardHeader className="pb-2">
@@ -463,43 +527,6 @@ export default function Dashboard() {
                         </CardFooter>
                     </Card>
                 </div>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <TrendingUp className="h-4 w-4" />
-                            Grafik Transaksi Periode
-                        </CardTitle>
-                        <CardDescription>
-                            Tren jumlah transaksi berdasarkan rentang tanggal terpilih.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid auto-cols-fr grid-flow-col items-end gap-3 overflow-x-auto">
-                            {transactionChartData.length > 0 ? (
-                                transactionChartData.map((point) => {
-                                    const barHeight = Math.max(10, Math.round((point.total / maxTransaction) * 140));
-
-                                    return (
-                                        <div key={point.day} className="flex flex-col items-center gap-2">
-                                            <span className="text-xs font-medium">{point.total}</span>
-                                            <div
-                                                className="w-full max-w-10 rounded-md bg-primary/85 transition-all hover:bg-primary"
-                                                style={{ height: `${barHeight}px` }}
-                                                title={`${point.day}: ${point.total} transaksi`}
-                                            />
-                                            <span className="text-muted-foreground text-xs">{point.day}</span>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="text-muted-foreground col-span-7 rounded-lg border border-dashed p-3 text-sm">
-                                    Belum ada data transaksi untuk ditampilkan.
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
 
                 {!isMitra && (
                     <Card>

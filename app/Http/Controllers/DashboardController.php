@@ -205,7 +205,7 @@ class DashboardController extends Controller
                     'stats' => $stats,
                     'recentActivities' => $recentActivities,
                     'performanceTargets' => $this->buildPerformanceTargets($rangeStart, $rangeEnd),
-                    'transactionChartData' => $this->buildRangeTransactionChart($rangeStart, $rangeEnd),
+                    'transactionChartData' => $this->buildRangeTransactionChart(now()->subDays(6)->startOfDay(), now()->endOfDay()),
                     'revenueSummary' => $revenueSummary,
                     'transactionBreakdown' => $transactionBreakdown,
                 ];
@@ -282,7 +282,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function buildRangeTransactionChart(Carbon $rangeStart, Carbon $rangeEnd): array
+    private function buildRangeTransactionChart(\Carbon\CarbonInterface $rangeStart, \Carbon\CarbonInterface $rangeEnd): array
     {
         $raw = Transaction::forCurrentUser()->select(
             DB::raw('DATE(created_at) as date'),
