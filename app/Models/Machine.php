@@ -7,13 +7,12 @@ use Illuminate\Support\Str;
 
 class Machine extends Model
 {
-    protected static function booted()
+    public function scopeForCurrentUser($query)
     {
-        static::addGlobalScope('mitra', function (\Illuminate\Database\Eloquent\Builder $builder) {
-            if (auth()->check() && auth()->user()->isMitra()) {
-                $builder->where($builder->getModel()->getTable() . '.user_id', auth()->id());
-            }
-        });
+        if (auth()->check() && auth()->user()->role === 'mitra') {
+            $query->where('machines.user_id', auth()->id());
+        }
+        return $query;
     }
 
     protected $fillable = [

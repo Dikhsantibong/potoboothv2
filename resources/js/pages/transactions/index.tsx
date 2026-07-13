@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Search, ReceiptText, Calendar, CheckCircle2, Clock, AlertCircle, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { Pagination } from '@/components/pagination';
@@ -85,6 +85,8 @@ const statusConfig: Record<string, { label: string, color: string, icon: any }> 
 export default function TransactionIndex({ transactions, filters }: Props) {
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
+    const { auth } = usePage<any>().props;
+    const isMitra = auth?.user?.role === 'mitra';
 
     const handleFilter = (key: string, value: string) => {
         const newFilters = {
@@ -201,13 +203,13 @@ return '-';
                                 <TableHead className="text-center">Status</TableHead>
                                 <TableHead>Started At</TableHead>
                                 <TableHead>Finished At</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
+                                {!isMitra && <TableHead className="w-[50px]"></TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {transactions.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center">
+                                    <TableCell colSpan={isMitra ? 8 : 9} className="h-24 text-center">
                                         {(filters.search || filters.status)
                                             ? 'No transactions match your filters.'
                                             : 'No transactions found.'}
@@ -260,16 +262,18 @@ return '-';
                                                     {formatDate(transaction.finished_at)}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    onClick={() => router.get(transactionsRoute.show({ id: transaction.id }).url)}
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
+                                            {!isMitra && (
+                                                <TableCell>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        onClick={() => router.get(transactionsRoute.show({ id: transaction.id }).url)}
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     );
                                 })

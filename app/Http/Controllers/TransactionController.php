@@ -17,6 +17,12 @@ class TransactionController extends Controller
     {
         $query = Transaction::with(['machine', 'template', 'finalImage'])->latest();
 
+        if (auth()->check() && auth()->user()->role === 'mitra') {
+            $query->whereIn('transactions.machine_id', function($q) {
+                $q->select('id')->from('machines')->where('user_id', auth()->id());
+            });
+        }
+
         // Search by transaction_id or machine name
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
@@ -43,6 +49,10 @@ class TransactionController extends Controller
      */
     public function show(Transaction $transaction): Response
     {
+        if (auth()->check() && auth()->user()->role === 'mitra') {
+            abort(403, 'Mitra is not allowed to view transaction details.');
+        }
+
         $transaction->load(['machine', 'template', 'photos.frame', 'finalImage', 'voucher']);
 
         return Inertia::render('transactions/show', [

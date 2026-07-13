@@ -18,8 +18,19 @@ trait BelongsToMachine
             if (empty($model->machine_id) && !app()->runningInConsole() && !request()->is('api/*')) {
                 $activeMachineId = Session::get('active_machine_id');
                 
+                $machineQuery = \App\Models\Machine::query();
+                if (auth()->check() && auth()->user()->role === 'mitra') {
+                    $machineQuery->where('user_id', auth()->id());
+                }
+
+                if ($activeMachineId) {
+                    if (!$machineQuery->clone()->where('id', $activeMachineId)->exists()) {
+                        $activeMachineId = null;
+                    }
+                }
+
                 if (!$activeMachineId) {
-                    $activeMachineId = \App\Models\Machine::first()?->id;
+                    $activeMachineId = $machineQuery->orderBy('name')->first()?->id;
                 }
 
                 if ($activeMachineId) {

@@ -15,11 +15,22 @@ class GalleryController extends Controller
      */
     public function index(Request $request): Response
     {
+        if (auth()->check() && auth()->user()->role === 'mitra') {
+            abort(403, 'Mitra is not allowed to view the gallery.');
+        }
         $query = FinalImage::with(['transaction.machine', 'transaction.template'])
             ->whereHas('transaction')
             ->whereNotNull('image_path')
             ->where('image_path', '!=', 'EXPIRED')
             ->latest();
+
+        if (auth()->check() && auth()->user()->role === 'mitra') {
+            $query->whereHas('transaction', function($q) {
+                $q->whereIn('transactions.machine_id', function($sq) {
+                    $sq->select('id')->from('machines')->where('user_id', auth()->id());
+                });
+            });
+        }
 
         // Search by Transaction ID (the string one from machine)
         if ($request->search) {

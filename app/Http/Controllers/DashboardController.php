@@ -39,8 +39,8 @@ class DashboardController extends Controller
         $previousRangeStart = $rangeStart->copy()->subDays($rangeDays);
         $previousRangeEnd = $rangeStart->copy()->subSecond();
 
-        $activeMachineId = session('active_machine_id') ?? Machine::first()?->id ?? 'none';
-        $userRole = auth()->check() && auth()->user()->isMitra() ? 'mitra:' . auth()->id() : 'admin';
+        $activeMachineId = session('active_machine_id') ?? Machine::forCurrentUser()->first()?->id ?? 'none';
+        $userRole = auth()->check() && auth()->user()->role === 'mitra' ? 'mitra:' . auth()->id() : 'admin';
 
         $payload = Cache::remember(
             "dashboard:metrics:{$rangeStart->toDateString()}:{$rangeEnd->toDateString()}:machine:{$activeMachineId}:role:{$userRole}",
@@ -48,20 +48,20 @@ class DashboardController extends Controller
             function () use ($rangeStart, $rangeEnd, $previousRangeStart, $previousRangeEnd) {
                 $successStatus = 'COMPLETED';
 
-                $periodTransactions = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])->count();
-                $previousPeriodTransactions = Transaction::whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])->count();
+                $periodTransactions = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])->count();
+                $previousPeriodTransactions = Transaction::forCurrentUser()->whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])->count();
 
                 $periodRevenue = (int) $this->revenueQuery(
-                    Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
+                    Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
                         ->where('status', $successStatus)
                 );
                 $previousPeriodRevenue = (int) $this->revenueQuery(
-                    Transaction::whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])
+                    Transaction::forCurrentUser()->whereBetween('created_at', [$previousRangeStart, $previousRangeEnd])
                         ->where('status', $successStatus)
                 );
 
-                $periodSessions = Transaction::whereBetween('started_at', [$rangeStart, $rangeEnd])->count();
-                $periodVoucherUsage = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
+                $periodSessions = Transaction::forCurrentUser()->whereBetween('started_at', [$rangeStart, $rangeEnd])->count();
+                $periodVoucherUsage = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->whereNotNull('voucher_id')
                     ->count();
                 $activeVoucherCount = Voucher::where('status', 'ready')->count();
@@ -93,7 +93,7 @@ class DashboardController extends Controller
                     ],
                 ];
 
-                $recentActivities = Transaction::with(['machine:id,name', 'template:id,name'])
+                $recentActivities = Transaction::forCurrentUser()->with(['machine:id,name', 'template:id,name'])
                     ->whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->latest()
                     ->limit(4)
@@ -122,7 +122,7 @@ class DashboardController extends Controller
                     $rangeStart->translatedFormat('d M Y'),
                     $rangeEnd->translatedFormat('d M Y')
                 );
-                $successTransactions = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
+                $successTransactions = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->where('status', $successStatus)
                     ->count();
                 $successRate = $periodTransactions > 0
@@ -130,7 +130,7 @@ class DashboardController extends Controller
                     : 0;
 
                 $totalRevenue = (int) $this->revenueQuery(
-                    Transaction::where('status', $successStatus)
+                    Transaction::forCurrentUser()->where('status', $successStatus)
                 );
 
                 $revenueSummary = [
@@ -144,14 +144,14 @@ class DashboardController extends Controller
                 ];
 
                 // --- QRIS & Voucher transaction breakdown ---
-                $qrisQuery = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
+                $qrisQuery = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->where('status', $successStatus)
                     ->whereRaw('LOWER(payment_type) = ?', ['qris']);
                 $qrisCount = (clone $qrisQuery)->count();
                 $qrisBase = (int) (clone $qrisQuery)->sum('amount');
                 $qrisPrint = $this->printRevenueOnly(clone $qrisQuery);
 
-                $voucherQuery = Transaction::whereBetween('created_at', [$rangeStart, $rangeEnd])
+                $voucherQuery = Transaction::forCurrentUser()->whereBetween('created_at', [$rangeStart, $rangeEnd])
                     ->where('status', $successStatus)
                     ->whereNotNull('voucher_id');
                 $voucherCount = (clone $voucherQuery)->count();
@@ -163,13 +163,13 @@ class DashboardController extends Controller
                 $voucherTotal = $voucherBase; // Voucher only gets base session
 
                 // All-time accumulated
-                $allQrisQuery = Transaction::where('status', $successStatus)
+                $allQrisQuery = Transaction::forCurrentUser()->where('status', $successStatus)
                     ->whereRaw('LOWER(payment_type) = ?', ['qris']);
                 $allQrisCount = (clone $allQrisQuery)->count();
                 $allQrisBase = (int) (clone $allQrisQuery)->sum('amount');
                 $allQrisPrint = $this->printRevenueOnly(clone $allQrisQuery);
 
-                $allVoucherQuery = Transaction::where('status', $successStatus)
+                $allVoucherQuery = Transaction::forCurrentUser()->where('status', $successStatus)
                     ->whereNotNull('voucher_id');
                 $allVoucherCount = (clone $allVoucherQuery)->count();
                 $allVoucherBase = (int) (clone $allVoucherQuery)->sum('amount');
@@ -213,7 +213,7 @@ class DashboardController extends Controller
         );
 
         // Fetch machines paper data outside of cache so it updates instantly
-        $machinesPaper = Machine::where('is_active', true)->get()->map(function ($m) {
+        $machinesPaper = Machine::forCurrentUser()->where('is_active', true)->get()->map(function ($m) {
             return [
                 'id' => $m->id,
                 'name' => $m->name,
@@ -261,13 +261,13 @@ class DashboardController extends Controller
         $revenueTarget = (int) config('dashboard.targets.revenue_per_day', 5000000);
         $uptimeTarget = (int) config('dashboard.targets.machine_uptime_percent', 95);
 
-        $todayTransactionCount = Transaction::whereBetween('created_at', [$todayStart, $todayEnd])->count();
+        $todayTransactionCount = Transaction::forCurrentUser()->whereBetween('created_at', [$todayStart, $todayEnd])->count();
         $todayRevenue = (int) $this->revenueQuery(
-            Transaction::whereBetween('created_at', [$todayStart, $todayEnd])
+            Transaction::forCurrentUser()->whereBetween('created_at', [$todayStart, $todayEnd])
                 ->where('status', 'COMPLETED')
         );
-        $activeMachines = Machine::where('is_active', true)->count();
-        $totalMachines = Machine::count();
+        $activeMachines = Machine::forCurrentUser()->where('is_active', true)->count();
+        $totalMachines = Machine::forCurrentUser()->count();
 
         $transactionProgress = max(0, min(100, (int) round(($todayTransactionCount / max(1, $transactionTarget)) * 100)));
         $revenueProgress = max(0, min(100, (int) round(($todayRevenue / max(1, $revenueTarget)) * 100)));
@@ -284,7 +284,7 @@ class DashboardController extends Controller
 
     private function buildRangeTransactionChart(Carbon $rangeStart, Carbon $rangeEnd): array
     {
-        $raw = Transaction::select(
+        $raw = Transaction::forCurrentUser()->select(
             DB::raw('DATE(created_at) as date'),
             DB::raw('COUNT(*) as total')
         )

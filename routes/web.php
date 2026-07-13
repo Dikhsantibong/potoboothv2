@@ -19,6 +19,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::resource('transactions', TransactionController::class)->only(['index', 'show']);
     Route::get('gallery', [GalleryController::class, 'index'])->name('gallery.index');
+    Route::post('machines/current', [\App\Http\Controllers\CurrentMachineController::class, 'store'])->name('machines.current');
 
     // Admin-only routes
     Route::middleware('admin')->group(function () {
@@ -27,7 +28,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         Route::resource('machines', MachineController::class);
         Route::post('machines/{machine}/reset-paper', [MachineController::class, 'resetPaper'])->name('machines.reset-paper');
-        Route::post('machines/current', [\App\Http\Controllers\CurrentMachineController::class, 'store'])->name('machines.current');
         Route::resource('paper-sizes', PaperSizeController::class);
         Route::resource('stickers', StickerController::class);
         Route::resource('templates', TemplateController::class);

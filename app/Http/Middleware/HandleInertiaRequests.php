@@ -35,7 +35,11 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $machines = \App\Models\Machine::orderBy('name')->get();
+        $machineQuery = \App\Models\Machine::orderBy('name');
+        if ($request->user() && $request->user()->role === 'mitra') {
+            $machineQuery->where('user_id', $request->user()->id);
+        }
+        $machines = $machineQuery->get();
         $activeMachineId = $request->session()->get('active_machine_id');
         $activeMachine = $machines->firstWhere('id', $activeMachineId) ?? $machines->first();
 
