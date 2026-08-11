@@ -12,7 +12,6 @@ class Iklan extends Model
     protected $fillable = [
         'title',
         'image_path',
-        'type',
         'status',
         'link',
         'description',

@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->string('image_path');
-            $table->enum('type', ['popup', 'banner'])->default('popup');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->string('link')->nullable();
             $table->text('description')->nullable();

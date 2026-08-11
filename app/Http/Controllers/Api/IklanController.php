@@ -15,10 +15,6 @@ class IklanController extends Controller
     {
         $query = Iklan::query();
 
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
         if ($request->filled('is_active')) {
             $query->where('status', $request->is_active == 1 ? 'active' : 'inactive');
         }

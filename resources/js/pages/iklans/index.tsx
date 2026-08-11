@@ -34,7 +34,6 @@ interface Iklan {
     title: string;
     image_path: string;
     image_url: string;
-    type: string;
     status: string;
     link: string | null;
     description: string | null;
@@ -65,7 +64,6 @@ interface Props {
     iklans: IklanPaginator;
     filters: {
         search?: string;
-        type?: string;
         status?: string;
     };
 }
@@ -74,13 +72,11 @@ export default function IklanIndex({ iklans, filters }: Props) {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedIklan, setSelectedIklan] = useState<Iklan | null>(null);
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
-    const [typeFilter, setTypeFilter] = useState(filters.type || 'all');
     const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
 
     const handleFilter = (key: string, value: string) => {
         const newFilters = {
             search: searchQuery,
-            type: typeFilter,
             status: statusFilter,
             [key]: value,
         };
@@ -104,7 +100,6 @@ export default function IklanIndex({ iklans, filters }: Props) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         title: '',
-        type: 'popup',
         status: 'active',
         image: null as File | null,
         link: '',
@@ -137,7 +132,6 @@ export default function IklanIndex({ iklans, filters }: Props) {
         setSelectedIklan(iklan);
         setData({
             title: iklan.title,
-            type: iklan.type,
             status: iklan.status,
             image: null,
             link: iklan.link || '',
@@ -222,12 +216,11 @@ export default function IklanIndex({ iklans, filters }: Props) {
                             />
                         </form>
                         <div className="flex flex-wrap items-center gap-2">
-                            {(filters.search || filters.type || filters.status) && (
+                            {(filters.search || filters.status) && (
                                 <Button
                                     variant="ghost"
                                     onClick={() => {
                                         setSearchQuery('');
-                                        setTypeFilter('all');
                                         setStatusFilter('all');
                                         router.get('/iklans');
                                     }}
@@ -236,19 +229,7 @@ export default function IklanIndex({ iklans, filters }: Props) {
                                     Reset Filters
                                 </Button>
                             )}
-                            <Select value={typeFilter} onValueChange={(val) => {
-                                setTypeFilter(val);
-                                handleFilter('type', val);
-                            }}>
-                                <SelectTrigger className="h-9 w-[150px] bg-sidebar shadow-none focus:ring-1">
-                                    <SelectValue placeholder="Semua Tipe" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Semua Tipe</SelectItem>
-                                    <SelectItem value="popup">Popup</SelectItem>
-                                    <SelectItem value="banner">Banner</SelectItem>
-                                </SelectContent>
-                            </Select>
+
 
                             <Select value={statusFilter} onValueChange={(val) => {
                                 setStatusFilter(val);
@@ -282,9 +263,6 @@ export default function IklanIndex({ iklans, filters }: Props) {
                                     <div className="absolute top-2 left-2 flex gap-1">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-medium text-white ${iklan.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}>
                                             {iklan.status}
-                                        </span>
-                                        <span className="px-2 py-0.5 rounded text-[10px] font-medium text-white bg-blue-500 capitalize">
-                                            {iklan.type}
                                         </span>
                                     </div>
 
@@ -374,20 +352,6 @@ export default function IklanIndex({ iklans, filters }: Props) {
                             </div>
 
                             <div className="col-span-2 sm:col-span-1 flex flex-col gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="type">Tipe Iklan</Label>
-                                    <Select value={data.type} onValueChange={(val) => setData('type', val)}>
-                                        <SelectTrigger id="type">
-                                            <SelectValue placeholder="Pilih tipe" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="popup">Popup Layar Penuh</SelectItem>
-                                            <SelectItem value="banner">Banner Berjalan</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.type && <p className="text-xs text-destructive">{errors.type}</p>}
-                                </div>
-                                
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="start_date">Mulai Tayang</Label>
@@ -485,20 +449,6 @@ export default function IklanIndex({ iklans, filters }: Props) {
                             </div>
 
                             <div className="col-span-2 sm:col-span-1 flex flex-col gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="edit-type">Tipe Iklan</Label>
-                                    <Select value={data.type} onValueChange={(val) => setData('type', val)}>
-                                        <SelectTrigger id="edit-type">
-                                            <SelectValue placeholder="Pilih tipe" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="popup">Popup Layar Penuh</SelectItem>
-                                            <SelectItem value="banner">Banner Berjalan</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.type && <p className="text-xs text-destructive">{errors.type}</p>}
-                                </div>
-                                
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="edit-start_date">Mulai Tayang</Label>
