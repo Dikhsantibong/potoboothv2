@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid, Monitor, Image as ImageIcon, FileText, Smile, ReceiptText, CreditCard, Ticket } from 'lucide-react';
+import { BookOpen, FolderGit2, LayoutGrid, Monitor, Image as ImageIcon, FileText, Smile, ReceiptText, CreditCard, Ticket, Megaphone } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -59,6 +59,11 @@ const mainNavItems: NavItem[] = [
         title: 'Stickers',
         href: stickers.index(),
         icon: Smile,
+    },
+    {
+        title: 'Iklan / Banners',
+        href: '/iklans',
+        icon: Megaphone,
     },
     {
         title: 'Paper Sizes',

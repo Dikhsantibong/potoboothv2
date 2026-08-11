@@ -31,6 +31,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('machines/{machine}/reset-paper', [MachineController::class, 'resetPaper'])->name('machines.reset-paper');
         Route::resource('paper-sizes', PaperSizeController::class);
         Route::resource('stickers', StickerController::class);
+        Route::resource('iklans', App\Http\Controllers\IklanController::class);
         Route::resource('templates', TemplateController::class);
         Route::patch('templates/{template}/toggle', [TemplateController::class, 'toggle'])->name('templates.toggle');
         Route::resource('transactions', TransactionController::class)->except(['index', 'show']);
