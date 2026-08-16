@@ -11,6 +11,7 @@ class FinalImage extends Model
         'token',
         'image_path',
         'video_path',
+        'gif_path',
         'amount_print',
         'print_quantity',
         'printed',
@@ -20,7 +21,7 @@ class FinalImage extends Model
         'printed' => 'boolean',
     ];
 
-    protected $appends = ['image_url', 'video_url'];
+    protected $appends = ['image_url', 'video_url', 'gif_url'];
 
     public function getImageUrlAttribute(): ?string
     {
@@ -30,6 +31,11 @@ class FinalImage extends Model
     public function getVideoUrlAttribute(): ?string
     {
         return $this->video_path ? asset('storage/' . $this->video_path) : null;
+    }
+
+    public function getGifUrlAttribute(): ?string
+    {
+        return $this->gif_path ? asset('storage/' . $this->gif_path) : null;
     }
 
     public function transaction()

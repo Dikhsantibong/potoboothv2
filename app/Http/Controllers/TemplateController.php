@@ -149,11 +149,18 @@ class TemplateController extends Controller
             ->toArray();
 
         $paperSizes = PaperSize::orderBy('name')->get();
+        $machines = \App\Models\Machine::forCurrentUser()->orderBy('name')->get(['id', 'name']);
+
+        $isUniversal = Template::withoutGlobalScope(\App\Models\Scopes\MachineScope::class)
+            ->where('template_path', $template->template_path)
+            ->count() > 1;
 
         return Inertia::render('templates/Edit', [
             'template' => $template->load('frames'),
             'existingCategories' => $existingCategories,
             'paperSizes' => $paperSizes,
+            'machines' => $machines,
+            'isUniversal' => $isUniversal,
         ]);
     }
 
@@ -169,6 +176,8 @@ class TemplateController extends Controller
             'paper_size_id' => 'required|exists:paper_sizes,id',
             'type' => 'required|in:reguler,koran,flipbook',
             'orientation' => 'required|in:portrait,landscape',
+            'target_machines' => 'nullable|array',
+            'target_machines.*' => 'exists:machines,id',
         ]);
 
         $frames = json_decode($request->frames, true);
@@ -198,6 +207,33 @@ class TemplateController extends Controller
             'orientation' => $request->orientation,
             'is_active' => true,
         ]);
+
+        $template->load('frames');
+
+        if ($request->has('target_machines') && is_array($request->target_machines)) {
+            $targetMachines = array_diff($request->target_machines, [$template->machine_id]);
+            
+            foreach ($targetMachines as $machineId) {
+                // Check if a template with the exact same name and type already exists for this machine to avoid duplicates
+                $exists = Template::withoutGlobalScope(\App\Models\Scopes\MachineScope::class)
+                    ->where('machine_id', $machineId)
+                    ->where('name', $template->name)
+                    ->where('type', $template->type)
+                    ->exists();
+
+                if (!$exists) {
+                    $newTemplate = $template->replicate();
+                    $newTemplate->machine_id = $machineId;
+                    $newTemplate->save();
+
+                    foreach ($template->frames as $frame) {
+                        $newFrame = $frame->replicate();
+                        $newFrame->template_id = $newTemplate->id;
+                        $newFrame->save();
+                    }
+                }
+            }
+        }
 
         return redirect()
             ->back()

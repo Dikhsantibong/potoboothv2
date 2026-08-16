@@ -13,6 +13,7 @@ import {
     ArrowLeft, Check, Copy, Circle, Square, Heart, Star, Triangle, Hexagon,
     MousePointer2, Pencil, Save, Trash2, ZoomIn, ZoomOut, RotateCcw, Loader2, Clipboard
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -44,13 +45,20 @@ interface Template {
     orientation: 'portrait' | 'landscape';
     type: string;
     paper_size_id: number;
+    machine_id: number;
     frames: Frame[];
+}
+interface Machine {
+    id: number;
+    name: string;
 }
 
 interface Props {
     template: Template;
     existingCategories: string[];
     paperSizes: PaperSize[];
+    machines: Machine[];
+    isUniversal: boolean;
 }
 
 // Shape configurations (SVG Paths)
@@ -76,7 +84,7 @@ const COMMON_STYLES = {
     cornerSize: 12,
 };
 
-export default function TemplateEdit({ template, existingCategories, paperSizes }: Props) {
+export default function TemplateEdit({ template, existingCategories, paperSizes, machines, isUniversal }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const fabricCanvas = useRef<fabric.Canvas | null>(null);
@@ -88,6 +96,7 @@ export default function TemplateEdit({ template, existingCategories, paperSizes 
     const [isDrawing, setIsDrawing] = useState(false);
     const [drawingPoints, setDrawingPoints] = useState<{ x: number, y: number }[]>([]);
     const [tempObjects, setTempObjects] = useState<fabric.FabricObject[]>([]);
+    const [applyMode, setApplyMode] = useState<'current' | 'universal' | 'custom'>('current');
 
     const { data, setData, put, processing, errors } = useForm<{
         name: string;
@@ -96,6 +105,7 @@ export default function TemplateEdit({ template, existingCategories, paperSizes 
         type: string;
         orientation: string;
         frames: string;
+        target_machines: number[];
     }>({
         name: template.name,
         category: template.category || '',
@@ -103,6 +113,7 @@ export default function TemplateEdit({ template, existingCategories, paperSizes 
         type: template.type || 'reguler',
         orientation: template.orientation || 'portrait',
         frames: '',
+        target_machines: [],
     });
 
     // Initialize Canvas
@@ -536,9 +547,16 @@ export default function TemplateEdit({ template, existingCategories, paperSizes 
                                 <CardTitle>Information</CardTitle>
                             </CardHeader>
                             <CardContent className="flex-1 overflow-auto pb-6">
-                                <div className="pt-4 grid gap-4">
+                                <div className="space-y-4">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="name">Template Name</Label>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="name">Template Name</Label>
+                                            {isUniversal && (
+                                                <Badge variant="secondary" className="text-[10px] bg-blue-100/50 text-blue-700 border-blue-200">
+                                                    Universal Template
+                                                </Badge>
+                                            )}
+                                        </div>
                                         <Input id="name" value={data.name} onChange={e => setData('name', e.target.value)} placeholder="e.g. Minimalist Wedding" required />
                                         {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
                                     </div>
@@ -598,6 +616,51 @@ export default function TemplateEdit({ template, existingCategories, paperSizes 
                                             {errors.orientation && <p className="text-sm text-destructive">{errors.orientation}</p>}
                                         </div>
                                     </div>
+
+                                    {machines && machines.length > 1 && !isUniversal && (
+                                        <div className="grid gap-2 mt-4">
+                                            <Label>Mode Penerapan Template</Label>
+                                            <Select value={applyMode} onValueChange={(v: any) => {
+                                                setApplyMode(v);
+                                                if (v === 'current') setData('target_machines', []);
+                                                if (v === 'universal') setData('target_machines', machines.filter(m => m.id !== template.machine_id).map(m => m.id));
+                                                if (v === 'custom') setData('target_machines', []);
+                                            }}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Pilih mode penerapan" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="current">Hanya Mesin Ini (Default)</SelectItem>
+                                                    <SelectItem value="universal">Jadikan Template Universal (Semua Mesin)</SelectItem>
+                                                    <SelectItem value="custom">Pilih Mesin Tertentu...</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+
+                                            {applyMode === 'custom' && (
+                                                <div className="grid grid-cols-2 gap-2 mt-2 p-3 bg-muted/20 rounded-md border">
+                                                    {machines.filter(m => m.id !== template.machine_id).map(machine => (
+                                                        <div key={machine.id} className="flex items-center space-x-2">
+                                                            <Checkbox
+                                                                id={`machine-${machine.id}`}
+                                                                checked={data.target_machines.includes(machine.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setData('target_machines', [...data.target_machines, machine.id]);
+                                                                    } else {
+                                                                        setData('target_machines', data.target_machines.filter(id => id !== machine.id));
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <Label htmlFor={`machine-${machine.id}`} className="font-normal cursor-pointer text-sm">
+                                                                {machine.name}
+                                                            </Label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {errors.target_machines && <p className="text-sm text-destructive">{errors.target_machines}</p>}
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

@@ -36,6 +36,7 @@ class FinalImageController extends Controller
             'template_id' => 'required|exists:templates,id',
             'image' => 'required|image|max:10240', // Max 10MB
             'video' => 'nullable|mimes:mp4,mov,avi,webm|max:51200',
+            'gif' => 'nullable|mimes:gif|max:20480', // Max 20MB
             'photos' => 'nullable|array',
             'photos.*.frame_id' => 'required_with:photos|exists:template_frames,id',
             'photos.*.image' => 'required_with:photos|image|max:10240',
@@ -59,10 +60,13 @@ class FinalImageController extends Controller
 
         $baseFolder = 'transaction_photo/' . $transaction->id;
 
-        // 1. Process Final Image/Video
+        // 1. Process Final Image/Video/GIF
         $imagePath = $request->file('image')->store($baseFolder . '/final_images', 'public');
         $videoPath = $request->hasFile('video')
             ? $request->file('video')->store($baseFolder . '/final_videos', 'public')
+            : null;
+        $gifPath = $request->hasFile('gif')
+            ? $request->file('gif')->store($baseFolder . '/final_gifs', 'public')
             : null;
 
         $finalImage = FinalImage::create([
@@ -70,6 +74,7 @@ class FinalImageController extends Controller
             'token' => $request->token_final_image,
             'image_path' => $imagePath,
             'video_path' => $videoPath,
+            'gif_path' => $gifPath,
         ]);
 
         // 2. Process Individual Photos (Source Photos)
