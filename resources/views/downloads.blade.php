@@ -67,12 +67,18 @@
         /* Hero Section */
         .hero-section {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 2rem;
             margin-bottom: 4rem;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
+            .hero-section {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
             .hero-section {
                 grid-template-columns: 1fr;
             }
@@ -280,6 +286,22 @@
                     <a href="{{ $finalImage->video_url }}" download="Roambooth_LivePhoto_{{ $finalImage->token }}.mp4"
                         class="download-btn">
                         <i data-lucide="download"></i> Download Video
+                    </a>
+                </div>
+            @endif
+
+            <!-- GIF Card -->
+            @if ($finalImage->gif_url)
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><i data-lucide="film"></i> Animated GIF</h2>
+                    </div>
+                    <div class="media-preview">
+                        <img src="{{ $finalImage->gif_url }}" alt="Animated GIF">
+                    </div>
+                    <a href="{{ $finalImage->gif_url }}" download="Roambooth_GIF_{{ $finalImage->token }}.gif"
+                        class="download-btn">
+                        <i data-lucide="download"></i> Download GIF
                     </a>
                 </div>
             @endif

@@ -40,8 +40,28 @@ class TemplateController extends Controller
             $query->where('orientation', $request->orientation);
         }
 
+        $paginator = $query->paginate(10)->withQueryString();
+
+        $pathsInCurrentPage = $paginator->pluck('template_path')->unique()->toArray();
+        $universalPaths = [];
+        
+        if (!empty($pathsInCurrentPage)) {
+            $universalPaths = Template::withoutGlobalScope(\App\Models\Scopes\MachineScope::class)
+                ->whereIn('template_path', $pathsInCurrentPage)
+                ->select('template_path')
+                ->groupBy('template_path')
+                ->havingRaw('COUNT(id) > 1')
+                ->pluck('template_path')
+                ->toArray();
+        }
+
+        $paginator->getCollection()->transform(function ($template) use ($universalPaths) {
+            $template->is_universal = in_array($template->template_path, $universalPaths);
+            return $template;
+        });
+
         return Inertia::render('templates/index', [
-            'templates' => $query->paginate(10)->withQueryString(),
+            'templates' => $paginator,
             'filters' => $request->only(['search', 'type', 'orientation']),
         ]);
     }

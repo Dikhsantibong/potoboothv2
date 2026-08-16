@@ -50,6 +50,7 @@ interface Template {
     image_height: number;
     frame_count: number;
     is_active: boolean;
+    is_universal?: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -281,7 +282,14 @@ export default function TemplateIndex({ templates, filters }: Props) {
                                         </TableCell>
                                         <TableCell className="font-medium">
                                             <div>
-                                                {template.name}
+                                                <div className="flex items-center gap-2">
+                                                    <span>{template.name}</span>
+                                                    {template.is_universal && (
+                                                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 leading-tight bg-blue-100/50 text-blue-700 border-blue-200">
+                                                            Universal
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 {template.category && (
                                                     <div className="text-xs text-muted-foreground">{template.category}</div>
                                                 )}
@@ -408,7 +416,14 @@ export default function TemplateIndex({ templates, filters }: Props) {
                                             </div>
                                         </div>
                                         <div className="p-3">
-                                            <h3 className="font-semibold truncate" title={template.name}>{template.name}</h3>
+                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                <h3 className="font-semibold truncate" title={template.name}>{template.name}</h3>
+                                                {template.is_universal && (
+                                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-blue-100/50 text-blue-700 border-blue-200 shrink-0">
+                                                        Universal
+                                                    </Badge>
+                                                )}
+                                            </div>
                                             {template.category && (
                                                 <p className="text-xs text-muted-foreground truncate">{template.category}</p>
                                             )}
