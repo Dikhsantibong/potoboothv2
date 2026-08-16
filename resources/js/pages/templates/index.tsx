@@ -285,7 +285,7 @@ export default function TemplateIndex({ templates, filters }: Props) {
                                                 <div className="flex items-center gap-2">
                                                     <span>{template.name}</span>
                                                     {template.is_universal && (
-                                                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 leading-tight bg-blue-100/50 text-blue-700 border-blue-200">
+                                                        <Badge className="text-[9px] px-1.5 py-0 leading-tight bg-blue-500 hover:bg-blue-600 text-white border-none">
                                                             Universal
                                                         </Badge>
                                                     )}
@@ -419,7 +419,7 @@ export default function TemplateIndex({ templates, filters }: Props) {
                                             <div className="flex items-center justify-between gap-2 mb-1">
                                                 <h3 className="font-semibold truncate" title={template.name}>{template.name}</h3>
                                                 {template.is_universal && (
-                                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-blue-100/50 text-blue-700 border-blue-200 shrink-0">
+                                                    <Badge className="text-[9px] px-1.5 py-0 bg-blue-500 hover:bg-blue-600 text-white border-none shrink-0">
                                                         Universal
                                                     </Badge>
                                                 )}

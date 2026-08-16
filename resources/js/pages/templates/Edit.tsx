@@ -552,7 +552,7 @@ export default function TemplateEdit({ template, existingCategories, paperSizes,
                                         <div className="flex items-center justify-between">
                                             <Label htmlFor="name">Template Name</Label>
                                             {isUniversal && (
-                                                <Badge variant="secondary" className="text-[10px] bg-blue-100/50 text-blue-700 border-blue-200">
+                                                <Badge className="text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-none">
                                                     Universal Template
                                                 </Badge>
                                             )}
