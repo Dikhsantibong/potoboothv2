@@ -301,8 +301,8 @@
                         <h2 class="card-title"><i data-lucide="film"></i> {{ $isGifVideo ? 'Slideshow Video' : 'Animated GIF' }}</h2>
                     </div>
                     <div class="media-preview">
-                        @if ($isGifVideo)
-                            <video src="{{ $finalImage->gif_url }}" controls loop muted playsinline preload="metadata" style="width: 100%; border-radius: 0.5rem;"></video>
+                        @if (preg_match('/\.(mp4|webm|mov|avi)$/i', $finalImage->gif_url))
+                            <video src="{{ $finalImage->gif_url }}" autoplay loop muted playsinline></video>
                         @else
                             <img src="{{ $finalImage->gif_url }}" alt="Animated GIF">
                         @endif

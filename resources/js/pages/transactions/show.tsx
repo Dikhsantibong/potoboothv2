@@ -319,16 +319,31 @@ return '-';
                             {transaction.final_image?.gif_url && !transaction.final_image.gif_url.includes('EXPIRED') ? (
                                 <>
                                     <div className="relative group max-w-xs mx-auto mb-6 bg-sidebar rounded-lg p-2 border">
-                                        <img
-                                            src={transaction.final_image.gif_url}
-                                            alt="Animated GIF"
-                                            className="rounded shadow-lg w-full max-h-[400px] object-contain"
-                                        />
+                                        {transaction.final_image.gif_url.match(/\.(mp4|webm|mov|avi)$/i) ? (
+                                            <video
+                                                src={transaction.final_image.gif_url}
+                                                autoPlay
+                                                loop
+                                                muted
+                                                playsInline
+                                                className="rounded shadow-lg w-full max-h-[400px] object-contain"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={transaction.final_image.gif_url}
+                                                alt="Animated GIF"
+                                                className="rounded shadow-lg w-full max-h-[400px] object-contain"
+                                            />
+                                        )}
                                     </div>
                                     <Button
                                         variant="secondary"
                                         className="w-full max-w-[240px]"
-                                        onClick={() => handleDownload(transaction.final_image!.gif_url!, `gif_${transaction.transaction_id}.gif`)}
+                                        onClick={() => {
+                                            const url = transaction.final_image!.gif_url!;
+                                            const ext = url.match(/\.([a-z0-9]+)$/i)?.[1] || 'gif';
+                                            handleDownload(url, `gif_${transaction.transaction_id}.${ext}`);
+                                        }}
                                     >
                                         <Download className="mr-2 h-4 w-4" />
                                         Download GIF
