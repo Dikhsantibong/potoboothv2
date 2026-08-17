@@ -290,18 +290,26 @@
                 </div>
             @endif
 
-            <!-- GIF Card -->
+            <!-- GIF / Slideshow Card -->
             @if ($finalImage->gif_url)
+                @php
+                    $isGifVideo = preg_match('/\.(mp4|webm|mov)$/i', $finalImage->gif_url);
+                    $gifExt = pathinfo(parse_url($finalImage->gif_url, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'mp4';
+                @endphp
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title"><i data-lucide="film"></i> Animated GIF</h2>
+                        <h2 class="card-title"><i data-lucide="film"></i> {{ $isGifVideo ? 'Slideshow Video' : 'Animated GIF' }}</h2>
                     </div>
                     <div class="media-preview">
-                        <img src="{{ $finalImage->gif_url }}" alt="Animated GIF">
+                        @if ($isGifVideo)
+                            <video src="{{ $finalImage->gif_url }}" controls loop muted playsinline preload="metadata" style="width: 100%; border-radius: 0.5rem;"></video>
+                        @else
+                            <img src="{{ $finalImage->gif_url }}" alt="Animated GIF">
+                        @endif
                     </div>
-                    <a href="{{ $finalImage->gif_url }}" download="Roambooth_GIF_{{ $finalImage->token }}.gif"
+                    <a href="{{ $finalImage->gif_url }}" download="Roambooth_Slideshow_{{ $finalImage->token }}.{{ $gifExt }}"
                         class="download-btn">
-                        <i data-lucide="download"></i> Download GIF
+                        <i data-lucide="download"></i> Download {{ $isGifVideo ? 'Video' : 'GIF' }}
                     </a>
                 </div>
             @endif

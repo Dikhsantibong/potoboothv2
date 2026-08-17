@@ -36,7 +36,7 @@ class FinalImageController extends Controller
             'template_id' => 'required|exists:templates,id',
             'image' => 'required|image|max:10240', // Max 10MB
             'video' => 'nullable|mimes:mp4,mov,avi,webm|max:51200',
-            'gif' => 'nullable|mimes:gif|max:20480', // Max 20MB
+            'gif' => 'nullable|mimes:gif,mp4,mov,avi,webm|max:51200', // Allow MP4 for slideshows
             'photos' => 'nullable|array',
             'photos.*.frame_id' => 'required_with:photos|exists:template_frames,id',
             'photos.*.image' => 'required_with:photos|image|max:10240',
