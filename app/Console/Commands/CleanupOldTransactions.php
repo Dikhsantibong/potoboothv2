@@ -32,25 +32,29 @@ class CleanupOldTransactions extends Command
             foreach ($transactions as $transaction) {
                 $this->comment("Deleting transaction #{$transaction->id} ({$transaction->transaction_id})...");
                 
-                // Delete session photos from storage
-                foreach ($transaction->photos as $photo) {
-                    if ($photo->photo_path) {
-                        Storage::disk('public')->delete($photo->photo_path);
+                try {
+                    // Delete session photos from storage
+                    foreach ($transaction->photos as $photo) {
+                        if ($photo->photo_path) {
+                            Storage::disk('public')->delete($photo->photo_path);
+                        }
                     }
-                }
 
-                // Delete final image and video from storage
-                if ($transaction->finalImage) {
-                    if ($transaction->finalImage->image_path) {
-                        Storage::disk('public')->delete($transaction->finalImage->image_path);
+                    // Delete final image and video from storage
+                    if ($transaction->finalImage) {
+                        if ($transaction->finalImage->image_path) {
+                            Storage::disk('public')->delete($transaction->finalImage->image_path);
+                        }
+                        if ($transaction->finalImage->video_path) {
+                            Storage::disk('public')->delete($transaction->finalImage->video_path);
+                        }
                     }
-                    if ($transaction->finalImage->video_path) {
-                        Storage::disk('public')->delete($transaction->finalImage->video_path);
-                    }
-                }
 
-                // Delete the transaction record (cascades to related tables)
-                $transaction->delete();
+                    // Delete the transaction record (cascades to related tables)
+                    $transaction->delete();
+                } catch (\Exception $e) {
+                    $this->error("Failed to delete transaction #{$transaction->id}: " . $e->getMessage());
+                }
             }
         });
 
